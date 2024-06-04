@@ -1,3 +1,4 @@
+import time
 import mysql.connector
 import numpy as np
 import random
@@ -248,14 +249,14 @@ def run_session(env, agent, num_episodes):
 			agent.update_q_value(state, action, reward, next_state, env)
 			state = next_state
 			total_reward += reward
-			print(f"\n{env.board}\n")
 
 		agent.decay_epsilon()
-		print(f"Episode {episode + 1}: Total Reward: {total_reward}")
+		if total_reward > 0:
+			print(f"Episode {episode + 1}: Total Reward: {total_reward}")
 
 # Nombre de threads
-num_threads = 1
-num_episodes = 100
+num_threads = 200
+num_episodes = 5000
 
 # Créer et démarrer les threads
 threads = []
@@ -266,9 +267,22 @@ for i in range(num_threads):
 	t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
 	threads.append(t)
 	t.start()
+	time.sleep(1)
 
 # Attendre que tous les threads se terminent
-for t in threads:
-	t.join()
+while threads:
+	print(f"Threads restants: {len(threads)}")
+	moyenne = 0
+	for t in threads:
+		moyenne += t.total_reward
+	moyenne = moyenne / len(threads)
+	print(f"Moyenne des récompenses: {moyenne}")
+	episode = 0
+	for t in threads:
+		episode += t.episode
+	episode = episode / len(threads)
+	print(f"Episode moyen: {episode}\n")
+	time.sleep(60)
+	threads = [t for t in threads if t.is_alive()]
 
 print("Apprentissage terminé.")
