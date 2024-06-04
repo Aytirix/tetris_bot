@@ -106,11 +106,10 @@ class SeleniumV2():
 					WebDriverWait(element, timeout).until(EC.element_to_be_clickable((by, value))).click()
 				else:
 					WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value))).click()
-			time.sleep(random.uniform(wait, wait*1.5))
 			return True
 		except Exception as e:
 			message = value if msg == True else msg
-			self.handle_exception(e, f"Fonction : {inspect.stack()[1][3]} | Sélecteur : " + message if message not in [None, False, True] else message)
+			self.handle_exception(e, f"Fonction :| Sélecteur : " + message if message not in [None, False, True] else message)
 			return False
 
 	def send_keys(self, by: By = None, value: str = None, keys: str = None, timeout: int = 1, msg: str = None, element: WebElement = None, clear: bool = True) -> bool:
@@ -139,7 +138,6 @@ class SeleniumV2():
 				if isinstance(keys, str):
 					for letter in keys:
 						elem.send_keys(letter)
-						time.sleep(random.uniform(0.05, 0.2))
 				else:
 					elem.send_keys(keys)
 			elif element and keys:
@@ -147,15 +145,12 @@ class SeleniumV2():
 				if isinstance(keys, str):
 					for letter in keys:
 						element.send_keys(letter)
-						time.sleep(random.uniform(0.05, 0.2))
 				else:
 					element.send_keys(keys)
-			
-			time.sleep(random.uniform(0.8, 3.3))
 			return True
 		except Exception as e:
 			message = value if msg == True else msg
-			self.handle_exception(e, f"Fonction : {inspect.stack()[1][3]} | Sélecteur : " + message if message not in [None, False, True] else message)
+			self.handle_exception(e, f"Fonction : | Sélecteur : " + message if message not in [None, False, True] else message)
 			return False
 
 	def alert_click(self, method: str) -> bool:
@@ -233,7 +228,6 @@ class SeleniumV2():
 		"""
 		try:
 			self.driver.get(page)
-			time.sleep(random.uniform(3, 5))
 			return True
 		except Exception as e:
 			self.handle_exception(e, False)

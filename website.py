@@ -8,7 +8,6 @@ class website():
 		self.username = username
 		self.driver = Driver()
 		self.driver.start_driver()
-		self.map_temp = []
 		self.map = []
 		self.execute_move = []
 		self.lock = False
@@ -20,9 +19,9 @@ class website():
 		"""
 		if not self.driver.change_page(self.url):
 			return False
-		if not self.driver.send_keys(By.CSS_SELECTOR, '[name="username"]', self.username):
+		if not self.driver.send_keys(By.CSS_SELECTOR, '[name="username"]', self.username, timeout=15):
 			return False
-		if not self.driver.click_element(By.CSS_SELECTOR, 'button'):
+		if not self.driver.click_element(By.CSS_SELECTOR, 'button', timeout=15):
 			return False
 		return True
 
@@ -30,12 +29,11 @@ class website():
 		"""
 		Lance une partie
 		"""
-		if not self.driver.send_keys(By.CSS_SELECTOR, '[name="roomName"]', "BOT_GAME"):
+		if not self.driver.send_keys(By.CSS_SELECTOR, '[name="roomName"]', "BOT", timeout=15):
 			return False
 		for i in range(2):
-			if not self.driver.click_element(By.CSS_SELECTOR, 'button'):
+			if not self.driver.click_element(By.CSS_SELECTOR, 'button', timeout=15):
 				return False
-			time.sleep(1)
 		return True
 
 	def move(self, move):
@@ -123,9 +121,9 @@ class website():
 					elif "red" in elems[col+line]:
 						color = 7
 					else:
-						print("Erreur lors de la récupération de la couleur (detectée: " + style + ")" )
+						print("Erreur lors de la récupération de la couleur" )
 						self.map = []
-						return False
+						return False 
 					tab[col].append(color)
 			if not self.lock:
 				self.map = tab
