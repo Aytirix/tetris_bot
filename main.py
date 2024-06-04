@@ -39,10 +39,13 @@ execute_move = threading.Thread(target=website.exexute_move)
 execute_move.daemon = True
 execute_move.start()
 
-while True:
+end_game = threading.Thread(target=website.check_end_game)
+end_game.daemon = True
+end_game.start()
+
+while end_game.is_alive():
 	print("\n"*4)
 	for line in website.map.copy():
 		print(str(line).replace(", ", " ").replace("[", "").replace("]", ""))
-	time.sleep(0.1)
-time.sleep(5000)
+	time.sleep(0.5)
 website.logout()
