@@ -61,47 +61,56 @@ class TetrisEnv:
 		rotation = self.piece_shapes[self.current_piece][rotation_idx]
 		board_copy = copy.deepcopy(self.board)
 		
-		max_y = len(board_copy[0]) - 1
 		max_x = len(board_copy) - 1
+		max_y = len(board_copy[0]) - 1
 
-		lowest_position = None
-		for drop_row in range(len(board_copy)):
-			can_place = True
-			for (x, y) in rotation:
-				if x + drop_row > max_x or y + col > max_y:
-					can_place = False
-					break
-				if board_copy[x + drop_row][y + col] != 0:
-					can_place = False
-					break
-			if not can_place:
-				break
-			lowest_position = drop_row
+		# Vérifiez que la pièce ne dépasse pas les limites horizontales
+		for _, y in rotation:
+			if y + col < 0 or y + col > max_y:
+				return self.get_state(), -10, True  # Pénalité pour un mouvement invalide
 
-		if lowest_position is not None:
-			for (x, y) in rotation:
-				board_copy[x + lowest_position - 1][y + col] = self.current_piece
+		# Recherche de la position la plus basse possible pour la pièce
+		lowest_position = max_x
+		for x, y in rotation:
+			for drop_row in range(max_x + 1):
+				test_x = drop_row + x
+				if test_x > max_x or board_copy[test_x][y + col] != 0:
+					lowest_position = min(lowest_position, drop_row - 1)
+					break
+
+		# Placement de la pièce si possible
+		if lowest_position >= 0:
+			for x, y in rotation:
+				if lowest_position + x > max_x or lowest_position + x < 0 or y + col < 0 or y + col > max_y:
+					return self.get_state(), -10, True  # Pénalité pour un mouvement invalide
+				board_copy[lowest_position + x][y + col] = self.current_piece
+			self.board = board_copy
+			reward = self.calculate_reward()
+			done = self.check_game_over()
+			self.current_piece = random.choice(list(self.piece_shapes.keys()))
+			return self.get_state(), reward, done
 		else:
-			return self.get_state(), -10, True  # Reward -10 for invalid move
+			return self.get_state(), -10, True  # Pénalité pour un mouvement invalide
 
-		self.board = board_copy
-		reward = self.calculate_reward()
-		done = self.check_game_over()
-		self.current_piece = random.choice(list(self.piece_shapes.keys()))
-		return self.get_state(), reward, done
 
 	def calculate_reward(self):
 		complete_lines = self.get_complete_lines(self.board)
 		holes = self.get_holes(self.board)
 		bumpiness = self.get_bumpiness(self.board)
 		max_height = self.get_max_height(self.board)
-		return complete_lines * 100 - holes * 10 - bumpiness * 5 - max_height * 2
-
-	def get_max_height(self, board):
-		return max(self.get_column_height(board, col) for col in range(len(board[0])))
+		return complete_lines * 200 - holes * 5 - bumpiness * 3 - max_height * 1
 
 	def get_complete_lines(self, board):
-		return sum(1 for row in board if all(cell != 0 for cell in row))
+		complete_lines = 0
+		for row in board:
+			if all(cell != 0 for cell in row):
+				complete_lines += 1
+				# Supprimer la ligne complète et ajouter une nouvelle ligne en haut
+				board = np.delete(board, np.where(np.all(board != 0, axis=1)), axis=0)
+				new_line = np.zeros((1, board.shape[1]))
+				board = np.vstack([new_line, board])
+		self.board = board
+		return complete_lines
 
 	def get_holes(self, board):
 		holes = 0
@@ -125,19 +134,22 @@ class TetrisEnv:
 				return len(board) - row
 		return 0
 
+	def get_max_height(self, board):
+		return max(self.get_column_height(board, col) for col in range(len(board[0])))
+
 	def check_game_over(self):
 		return any(self.board[0])
 
 class QLearningAgent:
-	def __init__(self, db_config, alpha=0.1, gamma=0.99, epsilon=1.0, epsilon_decay=0.995):
+	def __init__(self, db_config, alpha=0.1, gamma=0.80, epsilon=1.0, epsilon_decay=0.995):
 		self.alpha = alpha
 		self.gamma = gamma
 		self.epsilon = epsilon
 		self.epsilon_decay = epsilon_decay
 		self.db_config = db_config
 
-	def db_connect(self):
-		return mysql.connector.connect(**self.db_config)
+		self.conn = mysql.connector.connect(**self.db_config)
+		self.cursor = self.conn.cursor()
 
 	def __del__(self):
 		self.conn.close()
@@ -145,41 +157,39 @@ class QLearningAgent:
 	def get_q_value(self, state, action):
 		state_str = self.state_to_str(state)
 		action_str = self.action_to_str(action)
-		self.conn = self.db_connect()
-		self.cursor = self.conn.cursor()
-		try:
-			self.cursor.execute("SELECT q_value FROM q_values WHERE state=%s AND action=%s", (state_str, action_str))
-			result = self.cursor.fetchone()
-			self.conn.close()
-			if result:
-				return result[0]
-			else:
-				return 0.0
-		except:
-			self.conn.close()
+		self.cursor.execute("SELECT q_value FROM q_values WHERE state=%s AND action=%s", (state_str, action_str))
+		result = self.cursor.fetchone()
+		if result:
+			return result[0]
+		else:
 			return 0.0
 
-	def update_q_value(self, state, action, reward, next_state):
+	def update_q_value(self, state, action, reward, next_state, env):
 		state_str = self.state_to_str(state)
 		action_str = self.action_to_str(action)
-		best_next_action = max(self.get_valid_actions(next_state[1]), key=lambda a: self.get_q_value(next_state, a))
-		target = reward + self.gamma * self.get_q_value(next_state, best_next_action)
+		next_piece = next_state[1]  # Extraire la pièce du next_state
+		valid_actions = self.get_valid_actions(next_piece, env)
+		
+		if valid_actions:
+			best_next_action = max(valid_actions, key=lambda a: self.get_q_value(next_state, a))
+			target = reward + self.gamma * self.get_q_value(next_state, best_next_action)
+		else:
+			target = reward
+		
 		current_q_value = self.get_q_value(state, action)
 		new_q_value = current_q_value + self.alpha * (target - current_q_value)
-		self.conn = self.db_connect()
-		self.cursor = self.conn.cursor()
-		try:
-			self.cursor.execute(
-				"INSERT INTO q_values (state, action, q_value) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE q_value=%s",
-				(state_str, action_str, new_q_value, new_q_value)
-			)
-			self.conn.commit()
-		except:
-			pass
-		self.conn.close()
+		self.cursor.execute(
+			"INSERT INTO q_values (state, action, q_value) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE q_value=%s",
+			(state_str, action_str, new_q_value, new_q_value)
+		)
+		self.conn.commit()
 
-	def choose_action(self, state):
-		valid_actions = self.get_valid_actions(state[1])
+	def choose_action(self, state, env):
+		_, piece = state
+		valid_actions = self.get_valid_actions(piece, env)
+		if not valid_actions:
+			# Retourner une action par défaut si aucune action valide n'est trouvée
+			return (0, 0)  # Action par défaut (rotation_idx, col)
 		if random.random() < self.epsilon:
 			return random.choice(valid_actions)
 		else:
@@ -196,9 +206,28 @@ class QLearningAgent:
 		rotation_idx, col = action
 		return f"{rotation_idx}-{col}"
 
-	def get_valid_actions(self, piece):
+	def get_valid_actions(self, piece, env):
+		valid_actions = []
 		num_rotations = len(env.piece_shapes[piece])
-		return [(rot, col) for rot in range(num_rotations) for col in range(10)]
+		for rot in range(num_rotations):
+			for col in range(env.width):
+				if self.is_valid_action(env, piece, rot, col):
+					valid_actions.append((rot, col))
+		return valid_actions
+
+	def is_valid_action(self, env, piece, rotation_idx, col):
+		rotation = env.piece_shapes[piece][rotation_idx]
+		board_copy = copy.deepcopy(env.board)
+		max_x = len(board_copy) - 1
+		max_y = len(board_copy[0]) - 1
+
+		for x, y in rotation:
+			if y + col < 0 or y + col > max_y or x > max_x:
+				return False
+			if board_copy[x][y + col] != 0:
+				return False
+		return True
+
 # Configuration de la base de données
 db_config = {
 	'user': 'tetris_rl',
@@ -208,37 +237,38 @@ db_config = {
 }
 
 def run_session(env, agent, num_episodes):
-    for episode in range(num_episodes):
-        state = env.reset()
-        done = False
-        total_reward = 0
+	for episode in range(num_episodes):
+		state = env.reset()
+		done = False
+		total_reward = 0
 
-        while not done:
-            action = agent.choose_action(state)
-            next_state, reward, done = env.step(action)
-            agent.update_q_value(state, action, reward, next_state)
-            state = next_state
-            total_reward += reward
+		while not done:
+			action = agent.choose_action(state, env)
+			next_state, reward, done = env.step(action)
+			agent.update_q_value(state, action, reward, next_state, env)
+			state = next_state
+			total_reward += reward
+			print(f"\n{env.board}\n")
 
-        agent.decay_epsilon()
-        print(f"Episode {episode + 1}: Total Reward: {total_reward}")
+		agent.decay_epsilon()
+		print(f"Episode {episode + 1}: Total Reward: {total_reward}")
 
 # Nombre de threads
-num_threads = 4
-num_episodes = 1000
+num_threads = 1
+num_episodes = 100
 
 # Créer et démarrer les threads
 threads = []
 
 for i in range(num_threads):
-    env = TetrisEnv()
-    agent = QLearningAgent(db_config=db_config)
-    t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
-    threads.append(t)
-    t.start()
+	env = TetrisEnv()
+	agent = QLearningAgent(db_config=db_config)
+	t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
+	threads.append(t)
+	t.start()
 
 # Attendre que tous les threads se terminent
 for t in threads:
-    t.join()
+	t.join()
 
 print("Apprentissage terminé.")
