@@ -1,3 +1,4 @@
+import os
 import time
 import mysql.connector
 import numpy as np
@@ -262,12 +263,16 @@ num_episodes = 5000
 threads = []
 
 for i in range(num_threads):
+	os.system('cls' if os.name == 'nt' else 'clear')
+	print(f"Lancement du thread {i + 1}/{num_threads}")
 	env = TetrisEnv()
 	agent = QLearningAgent(db_config=db_config)
 	t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
 	threads.append(t)
 	t.start()
-	time.sleep(1)
+	time.sleep(0.250)
+
+os.system('cls' if os.name == 'nt' else 'clear')
 
 # Attendre que tous les threads se terminent
 while threads:
