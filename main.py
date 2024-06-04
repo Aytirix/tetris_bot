@@ -8,10 +8,14 @@ os.system('clear')
 
 try:
 	website = website("http://c2r7p2:3000", "BOT")
-	if not website.login():
-		print("Erreur lors de la connexion")
-		website.logout()
-		exit()
+	while True:
+		if website.login():
+			break
+			# print("Erreur lors de la connexion")
+			# website.logout()
+			# exit()
+		print("En attente de connexion")
+		time.sleep(1)
 
 	ia = IA(website)
 	end_game = threading.Thread(target=ia.get_piece_movement)

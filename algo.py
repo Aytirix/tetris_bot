@@ -22,28 +22,28 @@ class IA():
 		self.piece_shapes = {
 			1: [  # T shape rotations
 				[(2, 5), (2, 6), (2, 7), (1, 6)],  # Original
-				[(1, 6), (2, 6), (3, 6), (2, 5)],  # 90 degrees
-				[(2, 5), (2, 6), (2, 7), (3, 6)],  # 180 degrees
-				[(1, 6), (2, 6), (3, 6), (2, 7)]   # 270 degrees
+				[(1, 5), (2, 5), (3, 5), (2, 6)],   # 270 degrees
+				[(1, 5), (1, 6), (1, 7), (2, 6)],  # 180 degrees
+				[(1, 6), (2, 6), (3, 6), (2, 5)]  # 90 degrees
 			],
 			2: [  # L shape rotations
 				[(2, 5), (2, 6), (2, 7), (1, 7)],  # Original
-				[(1, 6), (2, 6), (3, 6), (3, 7)],  # 90 degrees
-				[(2, 5), (2, 6), (2, 7), (3, 5)],  # 180 degrees
+				[(1, 5), (2, 5), (3, 5), (3, 6)],  # 90 degrees
+				[(1, 5), (1, 6), (1, 7), (2, 5)],  # 180 degrees
 				[(1, 5), (1, 6), (2, 6), (3, 6)]   # 270 degrees
 			],
 			3: [  # J shape rotations
 				[(2, 5), (2, 6), (2, 7), (1, 5)],  # Original
-				[(1, 6), (2, 6), (3, 6), (3, 5)],  # 90 degrees
-				[(2, 5), (2, 6), (2, 7), (3, 7)],  # 180 degrees
-				[(1, 6), (2, 6), (3, 6), (1, 7)]   # 270 degrees
+				[(1, 5), (2, 5), (3, 5), (1, 6)],   # 270 degrees
+				[(1, 5), (1, 6), (1, 7), (2, 7)],  # 180 degrees
+				[(1, 6), (2, 6), (3, 6), (3, 5)]  # 90 degrees
 			],
 			4: [  # O shape (only one rotation)
 				[(1, 5), (1, 6), (2, 5), (2, 6)]   # Original
 			],
 			5: [  # I shape rotations
 				[(1, 5), (2, 5), (3, 5), (4, 5)],  # Original
-				[(2, 4), (2, 5), (2, 6), (2, 7)]   # 90 degrees
+				[(1, 5), (1, 6), (1, 7), (1, 8)]   # 90 degrees
 			],
 			6: [  # S shape rotations
 				[(2, 5), (2, 6), (1, 6), (1, 7)],  # Original
@@ -51,9 +51,10 @@ class IA():
 			],
 			7: [  # Z shape rotations
 				[(1, 5), (1, 6), (2, 6), (2, 7)],  # Original
-				[(2, 5), (2, 6), (3, 6), (3, 7)]   # 90 degrees
+				[(1, 6), (2, 6), (2, 5), (3, 5)]   # 90 degrees
 			]
 		}
+
 	def get_piece_movement(self):
 		while threading.current_thread().is_alive():
 			if not self.website.map:
@@ -81,23 +82,36 @@ class IA():
 		max_y = len(board_copy[0]) - 1
 		max_x = len(board_copy) - 1
 
-		for (x, y) in rotation:
-			try:
-				if y + col > max_y or x > max_x:
-					return None  # Out of bounds
-				if board_copy[x][y + col] != 0:
-					return None  # The position is already occupied
-				board_copy[x][y + col] = self.actual_piece
-			except IndexError:
-				return None  # Out of bounds
-		return board_copy
+		lowest_position = None
+
+		# Drop the piece to the lowest possible position
+		for drop_row in range(len(board_copy)):
+			can_place = True
+			for (x, y) in rotation:
+				if x + drop_row > max_x or y + col > max_y:
+					can_place = False
+					break
+				if board_copy[x + drop_row][y + col] != 0:
+					can_place = False
+					break
+			if not can_place:
+				break
+			lowest_position = drop_row
+
+		# Place the piece on the board_copy at the lowest valid position
+		if lowest_position is not None:
+			for (x, y) in rotation:
+				board_copy[x + lowest_position - 1][y + col] = self.actual_piece
+			return board_copy
+		else:
+			return None
 
 	def evaluate_board(self, board):
 		complete_lines = self.get_complete_lines(board)
 		holes = self.get_holes(board)
 		bumpiness = self.get_bumpiness(board)
-		t_spin_opportunity = self.get_t_spin_opportunity(board)
-		return complete_lines * 10 - holes * 5 - bumpiness * 2 + t_spin_opportunity * 15
+		height_penalty = self.get_height_penalty(board)
+		return complete_lines * 10 - holes * 5 - bumpiness * 2 - height_penalty * 3
 
 	def get_complete_lines(self, board):
 		return sum(1 for row in board if all(cell != 0 for cell in row))
@@ -124,9 +138,9 @@ class IA():
 				return len(board) - row
 		return 0
 
-	def get_t_spin_opportunity(self, board):
-		# Simplified T-Spin opportunity check for demonstration
-		return 1 if any(row.count(0) == 1 for row in board) else 0
+	def get_height_penalty(self, board):
+		heights = [self.get_column_height(board, col) for col in range(len(board[0]))]
+		return sum(heights) / len(heights)  # Average height of columns
 
 	def execute_best_move(self):
 		if not self.actual_piece:
