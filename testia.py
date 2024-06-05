@@ -6,6 +6,9 @@ import random
 import copy
 import threading
 
+totals_reward = 0
+totalepisode = 0
+
 class TetrisEnv:
 	def __init__(self, height=20, width=10):
 		self.height = height
@@ -239,7 +242,10 @@ db_config = {
 }
 
 def run_session(env, agent, num_episodes):
+	global totals_reward
+	global totalepisode
 	for episode in range(num_episodes):
+		totalepisode += 1
 		state = env.reset()
 		done = False
 		total_reward = 0
@@ -250,13 +256,14 @@ def run_session(env, agent, num_episodes):
 			agent.update_q_value(state, action, reward, next_state, env)
 			state = next_state
 			total_reward += reward
+			totals_reward += reward
 
 		agent.decay_epsilon()
 		if total_reward > 0:
 			print(f"Episode {episode + 1}: Total Reward: {total_reward}")
 
 # Nombre de threads
-num_threads = 200
+num_threads = 400
 num_episodes = 5000
 
 # Créer et démarrer les threads
@@ -272,22 +279,15 @@ for i in range(num_threads):
 	t.start()
 	time.sleep(0.250)
 
-os.system('cls' if os.name == 'nt' else 'clear')
-
 # Attendre que tous les threads se terminent
 while threads:
-	print(f"Threads restants: {len(threads)}")
-	moyenne = 0
-	for t in threads:
-		moyenne += t.total_reward
-	moyenne = moyenne / len(threads)
+	print(f"Threads restants: {len(threads)}/{num_threads}")
+	moyenne = totals_reward / totalepisode
 	print(f"Moyenne des récompenses: {moyenne}")
-	episode = 0
-	for t in threads:
-		episode += t.episode
-	episode = episode / len(threads)
-	print(f"Episode moyen: {episode}\n")
+	episode = totalepisode / num_threads
+	print(f"Episode moyen: {episode}/{num_episodes}\n")
 	time.sleep(60)
+
 	threads = [t for t in threads if t.is_alive()]
 
 print("Apprentissage terminé.")
