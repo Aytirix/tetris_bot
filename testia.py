@@ -1,3 +1,4 @@
+import datetime
 import os
 import time
 import mysql.connector
@@ -5,9 +6,12 @@ import numpy as np
 import random
 import copy
 import threading
+import zlib
+import base64
+import signal
 
-totals_reward = 0
 totalepisode = 0
+stop_requested = False  # Indicateur global pour demander l'arrêt
 
 class TetrisEnv:
 	def __init__(self, height=20, width=10):
@@ -64,17 +68,15 @@ class TetrisEnv:
 		if rotation_idx >= len(self.piece_shapes[self.current_piece]):
 			raise ValueError("Index de rotation invalide")
 		rotation = self.piece_shapes[self.current_piece][rotation_idx]
-		board_copy = copy.deepcopy(self.board)
+		board_copy = self.board.copy()  # Utilisation de la copie superficielle
 		
 		max_x = len(board_copy) - 1
 		max_y = len(board_copy[0]) - 1
 
-		# Vérifiez que la pièce ne dépasse pas les limites horizontales
 		for _, y in rotation:
 			if y + col < 0 or y + col > max_y:
-				return self.get_state(), -10, True  # Pénalité pour un mouvement invalide
+				return self.get_state(), -10, True
 
-		# Recherche de la position la plus basse possible pour la pièce
 		lowest_position = max_x
 		for x, y in rotation:
 			for drop_row in range(max_x + 1):
@@ -83,11 +85,10 @@ class TetrisEnv:
 					lowest_position = min(lowest_position, drop_row - 1)
 					break
 
-		# Placement de la pièce si possible
 		if lowest_position >= 0:
 			for x, y in rotation:
 				if lowest_position + x > max_x or lowest_position + x < 0 or y + col < 0 or y + col > max_y or board_copy[lowest_position + x][y + col] != 0:
-					return self.get_state(), -10, True  # Pénalité pour un mouvement invalide
+					return self.get_state(), -10, True
 				board_copy[lowest_position + x][y + col] = self.current_piece
 			self.board = board_copy
 			reward = self.calculate_reward()
@@ -95,8 +96,7 @@ class TetrisEnv:
 			self.current_piece = random.choice(list(self.piece_shapes.keys()))
 			return self.get_state(), reward, done
 		else:
-			return self.get_state(), -10, True  # Pénalité pour un mouvement invalide
-
+			return self.get_state(), -10, True
 
 	def calculate_reward(self):
 		complete_lines = self.get_complete_lines(self.board)
@@ -145,34 +145,79 @@ class TetrisEnv:
 	def check_game_over(self):
 		return any(self.board[0])
 
+class DatabaseManager:
+	def __init__(self, db_config = None):
+		self.db_config = {
+			'user': 'tetris_rl',
+			'password': 'tetris_rltetris_rl',
+			'host': '145.239.62.99',
+			'database': 'tetris_rl'} if db_config is None else db_config
+
+	def execute_query(self, query, params, retry_attempts=5):
+		for attempt in range(retry_attempts):
+			try:
+				conn = mysql.connector.connect(**self.db_config)
+				cursor = conn.cursor()
+				cursor.execute(query, params)
+				conn.commit()
+				return
+			except mysql.connector.errors.DatabaseError as e:
+				if e.errno == 1205:  # ER_LOCK_WAIT_TIMEOUT
+					if attempt < retry_attempts - 1:
+						time.sleep(1)  # Attendre avant de réessayer
+						continue
+					else:
+						print(f"Transaction failed after {retry_attempts} attempts due to lock wait timeout.")
+						raise
+				else:
+					raise
+			finally:
+				if conn.is_connected():
+					cursor.close()
+					conn.close()
+
+	def fetch_one(self, query, params):
+		try:
+			conn = mysql.connector.connect(**self.db_config)
+			cursor = conn.cursor()
+			cursor.execute(query, params)
+			result = cursor.fetchone()
+			return result
+		except Exception as e:
+			print(f"Error fetching data: {e}")
+			return None
+		finally:
+			if conn.is_connected():
+				cursor.close()
+				conn.close()
+
 class QLearningAgent:
-	def __init__(self, db_config, alpha=0.1, gamma=0.80, epsilon=1.0, epsilon_decay=0.0002):
+	def __init__(self, alpha=0.1, gamma=0.80, epsilon=1.0, epsilon_decay=0.001):
 		self.alpha = alpha
 		self.gamma = gamma
 		self.epsilon = epsilon
 		self.epsilon_decay = epsilon_decay
-		self.db_config = db_config
-
-		self.conn = mysql.connector.connect(**self.db_config)
-		self.cursor = self.conn.cursor()
-
-	def __del__(self):
-		self.conn.close()
+		self.db_manager = DatabaseManager()
+		self.q_values_cache = {}
 
 	def get_q_value(self, state, action):
 		state_str = self.state_to_str(state)
 		action_str = self.action_to_str(action)
-		self.cursor.execute("SELECT q_value FROM q_values WHERE state=%s AND action=%s", (state_str, action_str))
-		result = self.cursor.fetchone()
+		key = (state_str, action_str)
+		if key in self.q_values_cache:
+			return self.q_values_cache[key]
+		result = self.db_manager.fetch_one("SELECT q_value FROM q_values WHERE state=%s AND action=%s", (state_str, action_str))
 		if result:
-			return result[0]
+			q_value = result[0]
 		else:
-			return 0.0
+			q_value = 0.0
+		self.q_values_cache[key] = q_value
+		return q_value
 
 	def update_q_value(self, state, action, reward, next_state, env):
 		state_str = self.state_to_str(state)
 		action_str = self.action_to_str(action)
-		next_piece = next_state[1]  # Extraire la pièce du next_state
+		next_piece = next_state[1]
 		valid_actions = self.get_valid_actions(next_piece, env)
 		
 		if valid_actions:
@@ -180,14 +225,16 @@ class QLearningAgent:
 			target = reward + self.gamma * self.get_q_value(next_state, best_next_action)
 		else:
 			target = reward
-		
 		current_q_value = self.get_q_value(state, action)
 		new_q_value = current_q_value + self.alpha * (target - current_q_value)
-		self.cursor.execute(
-			"INSERT INTO q_values (state, action, q_value) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE q_value=%s",
-			(state_str, action_str, new_q_value, new_q_value)
-		)
-		self.conn.commit()
+		self.q_values_cache[(state_str, action_str)] = new_q_value
+
+	def save_q_values(self):
+		for (state_str, action_str), q_value in self.q_values_cache.items():
+			self.db_manager.execute_query(
+				"INSERT INTO q_values (state, action, q_value) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE q_value=%s",
+				(state_str, action_str, q_value, q_value))
+
 
 	def choose_action(self, state, env):
 		_, piece = state
@@ -205,11 +252,26 @@ class QLearningAgent:
 
 	def state_to_str(self, state):
 		board, piece = state
-		return f"{piece}-" + ''.join(map(str, board.flatten().astype(int)))
+		board_flattened = board.flatten().astype(np.uint8).tobytes()
+		compressed = zlib.compress(board_flattened)
+		encoded = base64.b64encode(compressed).decode('utf-8')
+		return f"{piece}-{encoded}"
+
+	def str_to_state(self, state_str):
+		piece, encoded_board = state_str.split('-')
+		compressed = base64.b64decode(encoded_board)
+		decompressed = zlib.decompress(compressed)
+		board_flattened = np.frombuffer(decompressed, dtype=np.uint8)
+		board = board_flattened.reshape((self.env_height, self.env_width))
+		return board, int(piece)
 
 	def action_to_str(self, action):
 		rotation_idx, col = action
 		return f"{rotation_idx}-{col}"
+
+	def str_to_action(self, action_str):
+		rotation_idx, col = map(int, action_str.split('-'))
+		return rotation_idx, col
 
 	def get_valid_actions(self, piece, env):
 		valid_actions = []
@@ -232,22 +294,16 @@ class QLearningAgent:
 				return False
 		return True
 
-# Configuration de la base de données
-db_config = {
-	'user': 'tetris_rl',
-	'password': 'tetris_rltetris_rl',
-	'host': '145.239.62.99',
-	'database': 'tetris_rl'
-}
-
 def run_session(env, agent, num_episodes):
-	global totals_reward
-	global totalepisode
+	global totalepisode, stop_requested
 	for episode in range(num_episodes):
+		if stop_requested:
+			break
 		totalepisode += 1
 		state = env.reset()
 		done = False
 		total_reward = 0
+		start_time = datetime.datetime.now()
 
 		while not done:
 			action = agent.choose_action(state, env)
@@ -255,49 +311,57 @@ def run_session(env, agent, num_episodes):
 			agent.update_q_value(state, action, reward, next_state, env)
 			state = next_state
 			total_reward += reward
-			totals_reward += reward
 
-		print(f"Episode {episode + 1}: Total Reward: {total_reward}")
 		agent.decay_epsilon()
-		if total_reward > 0:
-			print(f"Episode {episode + 1}: Total Reward: {total_reward}")
+		elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
+		print(f"Episode {episode + 1}: Total Reward: {total_reward} - Temps: {elapsed_time}s")
+	agent.save_q_values()
+
+def handle_stop_signal(signal, frame):
+	global stop_requested
+	stop_requested = True
+	print("Arrêt demandé, enregistrement des valeurs Q...")
+
+signal.signal(signal.SIGINT, handle_stop_signal)
 
 # Nombre de threads
-num_threads = 500
+num_threads = 1
 num_episodes = 5000
 
-# Créer et démarrer les threads
-threads = []
+if __name__ == "__main__":
+	os.system("clear" if os.name == "posix" else "cls")
+	print("Apprentissage en cours...")
+	threads = []
+	def launch_thread(num_threads, num_episodes):
+		global threads
+		try:
+			for i in range(num_threads):
+				print(f"Lancement du thread {i + 1}/{num_threads}")
+				env = TetrisEnv()
+				agent = QLearningAgent()
+				t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
+				threads.append(t)
+				t.start()
+				time.sleep(0.100)
+		except Exception as e:
+			print(f"Erreur lors du lancement des threads: {e}")
 
-def launch_thread(num_threads, num_episodes):
-	global threads
+	launch_thread(num_threads, num_episodes)
+	total_relance = 0
 	try:
-		for i in range(num_threads):
-			os.system('cls' if os.name == 'nt' else 'clear')
-			print(f"Lancement du thread {i + 1}/{num_threads}")
-			env = TetrisEnv()
-			agent = QLearningAgent(db_config=db_config)
-			t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
-			threads.append(t)
-			t.start()
-			time.sleep(0.500)
+		while threads:
+			# print(f"Threads restants: {len(threads)}/{num_threads}/ Total relancé: {total_relance}")
+			# moyenne = totals_reward / totalepisode
+			# print(f"Moyenne des récompenses: {moyenne}")
+			# episode = totalepisode / num_threads
+			# print(f"Episode moyen: {episode}/{num_episodes}\n")
+			time.sleep(60)
+
+			threads = [t for t in threads if t.is_alive()]
+			if len(threads) < num_threads and not stop_requested:
+				total_relance += num_threads - len(threads)
+				launch_thread(num_threads - len(threads), num_episodes)
 	except Exception as e:
-		print(f"Erreur lors du lancement des threads: {e}")
+		print(f"Erreur lors de la vérification des threads: {e}")
 
-launch_thread(num_threads, num_episodes)
-try:
-	while threads:
-		print(f"Threads restants: {len(threads)}/{num_threads}")
-		moyenne = totals_reward / totalepisode
-		print(f"Moyenne des récompenses: {moyenne}")
-		episode = totalepisode / num_threads
-		print(f"Episode moyen: {episode}/{num_episodes}\n")
-		time.sleep(60)
-
-		threads = [t for t in threads if t.is_alive()]
-		if len(threads) < num_threads:
-			launch_thread(num_threads - len(threads), num_episodes)
-except Exception as e:
-	print(f"Erreur lors de la vérification des threads: {e}")
-
-print("Apprentissage terminé.")
+	print("Apprentissage terminé.")
