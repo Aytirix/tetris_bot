@@ -1,21 +1,10 @@
-import cProfile
-import datetime
-import os
-import pstats
-import time
-import mysql.connector
-import numpy as np
-import random
-import copy
-import threading
-import zlib
-import base64
-import signal
-
-global totalepisode, stop_requested
+from tools import *
 
 class TetrisEnv:
 	def __init__(self, height=20, width=10):
+		self.statistique ={
+			"complete_lines": 0,
+		}
 		self.height = height
 		self.width = width
 		self.board = np.zeros((height, width))
@@ -104,7 +93,31 @@ class TetrisEnv:
 		holes = self.get_holes(self.board)
 		bumpiness = self.get_bumpiness(self.board)
 		max_height = self.get_max_height(self.board)
-		return complete_lines * 200 - holes * 5 - bumpiness * 3 - max_height * 1
+		filled_cells_score = self.get_filled_cells_score(self.board)
+		return complete_lines * 150 + filled_cells_score * 0.3 - holes * 40 - bumpiness * 4 - max_height * 3
+
+	def get_filled_cells_score(self, board):
+		score = 0
+		for row in range(len(board)):
+			for cell in board[row]:
+				if cell != 0:
+					# Ajouter une pondération en fonction de la hauteur de la ligne
+					poids = 1 + (len(board) - row) / (len(board))
+					score += (len(board) - row) * poids
+		return score
+
+	def get_complete_lines(self, board):
+		complete_lines = 0
+		new_board = board.copy()
+		for i, row in enumerate(board):
+			if all(cell != 0 for cell in row):
+				complete_lines += 1
+				# Supprimer la ligne complète et ajouter une nouvelle ligne en haut
+				new_board = np.delete(new_board, i, axis=0)
+				new_line = np.zeros((1, new_board.shape[1]))
+				new_board = np.vstack([new_line, new_board])
+		self.board = new_board
+		return complete_lines
 
 	def get_complete_lines(self, board):
 		complete_lines = 0
@@ -115,6 +128,7 @@ class TetrisEnv:
 				board = np.delete(board, np.where(np.all(board != 0, axis=1)), axis=0)
 				new_line = np.zeros((1, board.shape[1]))
 				board = np.vstack([new_line, board])
+				self.statistique["complete_lines"] += 1
 		self.board = board
 		return complete_lines
 
