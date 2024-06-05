@@ -86,7 +86,7 @@ class TetrisEnv:
 		# Placement de la pièce si possible
 		if lowest_position >= 0:
 			for x, y in rotation:
-				if lowest_position + x > max_x or lowest_position + x < 0 or y + col < 0 or y + col > max_y:
+				if lowest_position + x > max_x or lowest_position + x < 0 or y + col < 0 or y + col > max_y or board_copy[lowest_position + x][y + col] != 0:
 					return self.get_state(), -10, True  # Pénalité pour un mouvement invalide
 				board_copy[lowest_position + x][y + col] = self.current_piece
 			self.board = board_copy
@@ -222,14 +222,13 @@ class QLearningAgent:
 
 	def is_valid_action(self, env, piece, rotation_idx, col):
 		rotation = env.piece_shapes[piece][rotation_idx]
-		board_copy = copy.deepcopy(env.board)
-		max_x = len(board_copy) - 1
-		max_y = len(board_copy[0]) - 1
+		max_x = env.height - 1
+		max_y = env.width - 1
 
 		for x, y in rotation:
-			if y + col < 0 or y + col > max_y or x > max_x:
-				return False
-			if board_copy[x][y + col] != 0:
+			new_x = x
+			new_y = y + col
+			if new_y < 0 or new_y > max_y or new_x > max_x or env.board[new_x][new_y] != 0:
 				return False
 		return True
 
@@ -258,30 +257,34 @@ def run_session(env, agent, num_episodes):
 			total_reward += reward
 			totals_reward += reward
 
+		print(f"Episode {episode + 1}: Total Reward: {total_reward}")
 		agent.decay_epsilon()
 		if total_reward > 0:
 			print(f"Episode {episode + 1}: Total Reward: {total_reward}")
 
 # Nombre de threads
-num_threads = 1000
+num_threads = 500
 num_episodes = 5000
 
 # Créer et démarrer les threads
 threads = []
 
-try:
-	for i in range(num_threads):
-		os.system('cls' if os.name == 'nt' else 'clear')
-		print(f"Lancement du thread {i + 1}/{num_threads}")
-		env = TetrisEnv()
-		agent = QLearningAgent(db_config=db_config)
-		t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
-		threads.append(t)
-		t.start()
-		time.sleep(0.500)
-except Exception as e:
-	print(f"Erreur lors du lancement des threads: {e}")
+def launch_thread(num_threads, num_episodes):
+	global threads
+	try:
+		for i in range(num_threads):
+			os.system('cls' if os.name == 'nt' else 'clear')
+			print(f"Lancement du thread {i + 1}/{num_threads}")
+			env = TetrisEnv()
+			agent = QLearningAgent(db_config=db_config)
+			t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
+			threads.append(t)
+			t.start()
+			time.sleep(0.500)
+	except Exception as e:
+		print(f"Erreur lors du lancement des threads: {e}")
 
+launch_thread(num_threads, num_episodes)
 try:
 	while threads:
 		print(f"Threads restants: {len(threads)}/{num_threads}")
@@ -292,6 +295,8 @@ try:
 		time.sleep(60)
 
 		threads = [t for t in threads if t.is_alive()]
+		if len(threads) < num_threads:
+			launch_thread(num_threads - len(threads), num_episodes)
 except Exception as e:
 	print(f"Erreur lors de la vérification des threads: {e}")
 
