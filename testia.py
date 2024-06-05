@@ -146,7 +146,7 @@ class TetrisEnv:
 		return any(self.board[0])
 
 class QLearningAgent:
-	def __init__(self, db_config, alpha=0.1, gamma=0.80, epsilon=1.0, epsilon_decay=0.995):
+	def __init__(self, db_config, alpha=0.1, gamma=0.80, epsilon=1.0, epsilon_decay=0.0002):
 		self.alpha = alpha
 		self.gamma = gamma
 		self.epsilon = epsilon
@@ -263,31 +263,36 @@ def run_session(env, agent, num_episodes):
 			print(f"Episode {episode + 1}: Total Reward: {total_reward}")
 
 # Nombre de threads
-num_threads = 400
+num_threads = 1000
 num_episodes = 5000
 
 # Créer et démarrer les threads
 threads = []
 
-for i in range(num_threads):
-	os.system('cls' if os.name == 'nt' else 'clear')
-	print(f"Lancement du thread {i + 1}/{num_threads}")
-	env = TetrisEnv()
-	agent = QLearningAgent(db_config=db_config)
-	t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
-	threads.append(t)
-	t.start()
-	time.sleep(0.250)
+try:
+	for i in range(num_threads):
+		os.system('cls' if os.name == 'nt' else 'clear')
+		print(f"Lancement du thread {i + 1}/{num_threads}")
+		env = TetrisEnv()
+		agent = QLearningAgent(db_config=db_config)
+		t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
+		threads.append(t)
+		t.start()
+		time.sleep(0.500)
+except Exception as e:
+	print(f"Erreur lors du lancement des threads: {e}")
 
-# Attendre que tous les threads se terminent
-while threads:
-	print(f"Threads restants: {len(threads)}/{num_threads}")
-	moyenne = totals_reward / totalepisode
-	print(f"Moyenne des récompenses: {moyenne}")
-	episode = totalepisode / num_threads
-	print(f"Episode moyen: {episode}/{num_episodes}\n")
-	time.sleep(60)
+try:
+	while threads:
+		print(f"Threads restants: {len(threads)}/{num_threads}")
+		moyenne = totals_reward / totalepisode
+		print(f"Moyenne des récompenses: {moyenne}")
+		episode = totalepisode / num_threads
+		print(f"Episode moyen: {episode}/{num_episodes}\n")
+		time.sleep(60)
 
-	threads = [t for t in threads if t.is_alive()]
+		threads = [t for t in threads if t.is_alive()]
+except Exception as e:
+	print(f"Erreur lors de la vérification des threads: {e}")
 
 print("Apprentissage terminé.")
