@@ -1,7 +1,6 @@
-from tools import *
-from tetris_env import TetrisEnv
-from database_manager import DatabaseManager
-from ia import QLearningAgent
+from IA.tools import *
+from IA.tetris_env import TetrisEnv
+from IA.ia import QLearningAgent
 
 os.system("clear" if os.name == "posix" else "cls")
 env = TetrisEnv(print_map=True)

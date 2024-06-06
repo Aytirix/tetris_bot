@@ -1,7 +1,6 @@
-from tools import *
-from tetris_env import TetrisEnv
-from database_manager import DatabaseManager
-from ia import QLearningAgent
+from IA.tools import *
+from IA.tetris_env import TetrisEnv
+from IA.ia import QLearningAgent
 
 stop_requested = False
 totalepisode = 0
@@ -26,6 +25,8 @@ signal.signal(signal.SIGINT, handle_stop_signal)
 
 def run_session(env, agent, num_episodes):
 	global totalepisode, stop_requested, debug_print_map
+	line = 0
+	tetris = 0
 	for episode in range(num_episodes):
 		if stop_requested:
 			break
@@ -33,27 +34,21 @@ def run_session(env, agent, num_episodes):
 		state = env.reset()
 		done = False
 		total_reward = 0
-		start_time = datetime.datetime.now()
 
 		while not done and not stop_requested:
 			action = agent.choose_action(state, env)
 			next_state, reward, done = env.step(action)
-			agent.update_q_value(state, action, reward, next_state, env)
 			state = next_state
 			total_reward += reward
 			if debug_print_map:
 				print_map(state[0])
-			if len(agent.q_values_cache) >= 300:
-				agent.save_q_values()
 
+		line += env.statistique["complete_lines"]
+		tetris += env.statistique["tetris"]
 		print("\n\n\n")
 		print_map(state[0])
-		print("Total lines: ", env.statistique["complete_lines"])
-		print("Total tetris: ", env.statistique["tetris"])
-		agent.decay_epsilon()
-		elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
-		print(f"Episode {episode + 1}: Total Reward: {total_reward} - Temps: {elapsed_time}s")
-	agent.save_q_values()
+		print(f"Episode {totalepisode} - Reward: {total_reward} - Complete lines: {env.statistique['complete_lines']} - Tetris: {env.statistique['tetris']} - Total lines: {line} - Total tetris: {tetris}")
+	print(f"Total Episode: {num_episodes} - Total lines: {line} - Total tetris: {tetris} soit en moyenne {line / num_episodes} lignes et {tetris / num_episodes} tetris par partie.")
 
 def launch_thread(num_threads, num_episodes):
 	global threads
@@ -61,7 +56,7 @@ def launch_thread(num_threads, num_episodes):
 		for i in range(num_threads):
 			print(f"Lancement du thread {i + 1}/{num_threads}")
 			env = TetrisEnv(tetris_height, tetris_width, complete_lines, filled_cells_score, holes, bumpiness, max_height, malus_move_error, debug_print_map)
-			agent = QLearningAgent(float(os.getenv("ALPHA")), float(os.getenv("GAMMA")), float(os.getenv("EPSILON")), float(os.getenv("EPSILON_DECAY")))
+			agent = QLearningAgent()
 			t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
 			threads.append(t)
 			t.start()

@@ -1,4 +1,4 @@
-from tools import *
+from IA.tools import *
 
 class TetrisEnv:
 	def __init__(self, height=20, width=10, complete_lines=200, filled_cells_score=0.3, holes=40, bumpiness=4, max_height=3, move_error=-10000, print_map=False):
@@ -65,6 +65,10 @@ class TetrisEnv:
 	def reset(self):
 		self.board = np.zeros((self.height, self.width))
 		self.random_piece()
+		self.statistique ={
+			"complete_lines": 0,
+			"tetris": 0,
+		}
 		return self.get_state()
 
 	def get_state(self):

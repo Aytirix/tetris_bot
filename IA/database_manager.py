@@ -1,4 +1,4 @@
-from tools import *
+from IA.tools import *
 
 class DatabaseManager:
 	def __init__(self):
