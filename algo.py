@@ -1,8 +1,7 @@
 import copy
 from tools import *
-# from SeleniumV2 import SeleniumV2
-# from Driver import Driver
 from website import *
+from IA.ia import QLearningAgent
 
 """
 	0 = case vide
@@ -19,6 +18,10 @@ class IA():
 	def __init__(self, website):
 		self.website = website
 		self.actual_piece = None
+		self.agent = QLearningAgent()
+		self.width = 10
+		self.height = 20
+		self.board = None
 		self.piece_shapes = {
 			1: [  # T shape rotations
 				[(2, 5), (2, 6), (2, 7), (1, 6)],  # Original
@@ -60,112 +63,39 @@ class IA():
 			if not self.website.map:
 				continue
 			for i in range(5, 8):
-				if self.website.map[1][i] != 0:
+				if self.website.map[1][i] != 0 and self.website.map[1][i] != self.actual_piece:
 					self.actual_piece = self.website.map[1][i]
-
-	def get_best_move(self):
-		best_score = float('-inf')
-		best_move = None
-		for rotation_idx, rotation in enumerate(self.piece_shapes[self.actual_piece]):
-			for col in range(len(self.website.map[0]) - max(y for x, y in rotation)):
-				simulated_board = self.simulate_board(rotation, col)
-				if simulated_board is None:
-					continue
-				score = self.evaluate_board(simulated_board)
-				if score > best_score:
-					best_score = score
-					best_move = (rotation_idx, col)
-		return best_move
-
-	def simulate_board(self, rotation, col):
-		board_copy = copy.deepcopy(self.website.map)
-		max_y = len(board_copy[0]) - 1
-		max_x = len(board_copy) - 1
-
-		lowest_position = None
-
-		# Drop the piece to the lowest possible position
-		for drop_row in range(len(board_copy)):
-			can_place = True
-			for (x, y) in rotation:
-				if x + drop_row > max_x or y + col > max_y:
-					can_place = False
 					break
-				if board_copy[x + drop_row][y + col] != 0:
-					can_place = False
-					break
-			if not can_place:
-				break
-			lowest_position = drop_row
-
-		# Place the piece on the board_copy at the lowest valid position
-		if lowest_position is not None:
-			for (x, y) in rotation:
-				board_copy[x + lowest_position - 1][y + col] = self.actual_piece
-			return board_copy
-		else:
-			return None
-
-	def evaluate_board(self, board):
-		complete_lines = self.get_complete_lines(board)
-		holes = self.get_holes(board)
-		bumpiness = self.get_bumpiness(board)
-		height_penalty = self.get_height_penalty(board)
-		return complete_lines * 10 - holes * 5 - bumpiness * 2 - height_penalty * 3
-
-	def get_complete_lines(self, board):
-		return sum(1 for row in board if all(cell != 0 for cell in row))
-
-	def get_holes(self, board):
-		holes = 0
-		for col in range(len(board[0])):
-			block_found = False
-			for row in range(len(board)):
-				if board[row][col] != 0:
-					block_found = True
-				elif block_found:
-					holes += 1
-		return holes
-
-	def get_bumpiness(self, board):
-		heights = [self.get_column_height(board, col) for col in range(len(board[0]))]
-		bumpiness = sum(abs(heights[i] - heights[i+1]) for i in range(len(heights) - 1))
-		return bumpiness
-
-	def get_column_height(self, board, col):
-		for row in range(len(board)):
-			if board[row][col] != 0:
-				return len(board) - row
-		return 0
-
-	def get_height_penalty(self, board):
-		heights = [self.get_column_height(board, col) for col in range(len(board[0]))]
-		return sum(heights) / len(heights)  # Average height of columns
-
+			
 	def execute_best_move(self):
 		if not self.actual_piece:
 			return None
-		best_move = self.get_best_move()
+		self.board = np.array(self.website.map)
+		best_move = self.agent.choose_action((self.board, self.actual_piece), self)
 		if not best_move:
 			return None
-		rotation_idx, target_col = best_move
-		current_col = 5  # Assuming the piece starts at column 5
+		rotation_idx, target_col, last_move = best_move
 
 		# Rotate the piece to the best rotation
 		for _ in range(rotation_idx):
 			self.website.move(Keys.UP)
 		
 		# Move the piece to the target column
-		while current_col > target_col:
-			self.website.move(Keys.LEFT)
-			current_col -= 1
-		
-		while current_col < target_col:
-			self.website.move(Keys.RIGHT)
-			current_col += 1
-		
+		if target_col > 0:
+			for _ in range(target_col):
+				self.website.move(Keys.RIGHT)
+		else:
+			for _ in range(abs(target_col)):
+				self.website.move(Keys.LEFT)
+
 		# Drop the piece
 		self.website.move(Keys.SPACE)
-		
+		if last_move > 0:
+			for _ in range(last_move):
+				self.website.move(Keys.RIGHT)
+		else:
+			for _ in range(abs(last_move)):
+				self.website.move(Keys.LEFT)
+
 		# Reset actual_piece to None to await the next piece
 		self.actual_piece = None

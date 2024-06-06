@@ -14,7 +14,7 @@ import signal
 from dotenv import load_dotenv, set_key
 load_dotenv()
 
-def print_map(map):
+def print_map(map, linecompleteindex = []):	
 	width = len(map[0])
 	height = len(map)
 	for y in range(height):
@@ -35,5 +35,9 @@ def print_map(map):
 				print("🟥", end="")
 			elif map[y][x] == 7:
 				print("🟩", end="")
+			elif map[y][x] == 8: # For debugging purposes
+				print("🔴", end="")
+		if linecompleteindex is not None and y in linecompleteindex:
+			print("⬅️", end="")
 		print("")
 	print("")

@@ -11,9 +11,6 @@ try:
 	while True:
 		if website.login():
 			break
-			# print("Erreur lors de la connexion")
-			# website.logout()
-			# exit()
 		print("En attente de connexion")
 		time.sleep(1)
 
@@ -27,7 +24,6 @@ try:
 		website.logout()
 		exit()
 
-
 	thread = threading.Thread(target=website.get_map)
 	thread.daemon = True
 	thread.start()
@@ -40,13 +36,8 @@ try:
 	end_game.daemon = True
 	end_game.start()
 
-
 	while end_game.is_alive():
-		print("\n"*4)
-
-		ia.map = website.map
 		ia.execute_best_move()
-		time.sleep(1)
 except Exception as e:
 	print(f"Erreur inattendu :{e}")
 finally:

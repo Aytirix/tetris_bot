@@ -19,9 +19,9 @@ class website():
 		"""
 		if not self.driver.change_page(self.url):
 			return False
-		if not self.driver.send_keys(By.CSS_SELECTOR, '[name="username"]', self.username, timeout=15):
+		if not self.driver.send_keys(By.CSS_SELECTOR, '[name="username"]', self.username, timeout=5):
 			return False
-		if not self.driver.click_element(By.CSS_SELECTOR, 'button', timeout=15):
+		if not self.driver.click_element(By.CSS_SELECTOR, 'button', timeout=5):
 			return False
 		return True
 

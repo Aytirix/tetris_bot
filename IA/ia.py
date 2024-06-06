@@ -55,18 +55,18 @@ class QLearningAgent:
 		_, piece = state
 		valid_actions = self.get_valid_actions(piece, env)
 		if not valid_actions:
-			return (0, 0)
+			return (0, 0, 0)
 		if random.random() < self.epsilon:
 			return random.choice(valid_actions)
 		else:
 			i = 0
 			action_q_values = [(a, self.get_q_value(state, a)) for a in valid_actions]
-			for action, q_value in action_q_values:
-				print(f"Action {i}: {action} - Q-Value: {q_value}")
+			# for action, q_value in action_q_values:
+			# 	print(f"Action {i}: {action} - Q-Value: {q_value}")
 			max_q_value = max(action_q_values, key=lambda x: x[1])[1]
 			best_actions = [action for action, q_value in action_q_values if q_value == max_q_value]
 			best_action = random.choice(best_actions)
-			print(f"Best Action: {best_action}")
+			# print(f"Best Action: {best_action}")
 			return best_action
 
 	def decay_epsilon(self):
@@ -88,8 +88,8 @@ class QLearningAgent:
 		return board, int(piece)
 
 	def action_to_str(self, action):
-		rotation_idx, col = action
-		return f"{rotation_idx}-{col}"
+		rotation_idx, col, last_move = action
+		return f"{rotation_idx}-{col}-{last_move}"
 
 	def str_to_action(self, action_str):
 		rotation_idx, col = map(int, action_str.split('-'))
@@ -101,7 +101,10 @@ class QLearningAgent:
 		for rot in range(num_rotations):
 			for col in range(-env.width + 1, env.width):
 				if self.is_valid_action(env, piece, rot, col):
-					valid_actions.append((rot, col))
+					valid_actions.append((rot, col, 0))
+					last_move = self.is_late_move_valid(env, piece, rot, col)
+					if last_move != 0:
+						valid_actions.append((rot, col, last_move))
 		return valid_actions
 
 	def is_valid_action(self, env, piece, rotation_idx, col_offset):
@@ -109,30 +112,66 @@ class QLearningAgent:
 		max_x = env.height - 1
 		max_y = env.width - 1
 
-		for x, y in rotation:
-			new_x = x
-			new_y = y + col_offset
-			if new_y < 0 or new_y > max_y or new_x > max_x or env.board[new_x][new_y] != 0:
-				return False
-			
-		# Vérifier si un mouvement de rotation est possible juste avant de fixer la pièce
-		if not self.can_rotate_in_place(env, piece, rotation_idx, col_offset):
-			return False
+		for y, x in rotation:
+			start_x = x 
+			new_x = x + col_offset
+			new_y = y
+
+			if new_x < 0 or new_x > max_y or new_y > max_x:
+				return False  # le bloc cible est hors limites
+
+			# Déterminer la direction du balayage pour vérifier les cellules intermédiaires
+			step = 1 if new_x > start_x else -1
+
+			# Vérifier chaque cellule entre la position de départ et la position cible
+			for intermediate_x in range(start_x, new_x + step, step):
+				if env.board[new_y][intermediate_x] != 0:
+					return False
 
 		return True
 
-	def can_rotate_in_place(self, env, piece, rotation_idx, col_offset):
-		# Tester les différentes rotations possibles à partir de la position actuelle
-		possible_rotations = len(env.piece_shapes[piece])
-		for next_rotation in range(possible_rotations):
-			if next_rotation == rotation_idx:
-				continue  # ignorer la rotation actuelle
-			next_rotation_positions = env.piece_shapes[piece][next_rotation]
-			if all(self.is_cell_free(env, x, y + col_offset) for x, y in next_rotation_positions):
-				return True
-		return False
+	def is_late_move_valid(self, env, piece, rotation_idx, col_offset):
+		rotation = env.piece_shapes[piece][rotation_idx]
+		max_x = env.width - 1
+		max_y = env.height - 1
+		board_copy = copy.deepcopy(env.board)
 
-	def is_cell_free(self, env, x, y):
-		max_x = env.height - 1
-		max_y = env.width - 1
-		return 0 <= y <= max_y and 0 <= x <= max_x and env.board[x][y] == 0
+		# Déterminez la position la plus basse pour la pièce
+		lowest_positions = []
+		for y, x in rotation:
+			for potential_y in range(max_y + 1):
+				adjusted_y = y + potential_y
+				adjusted_x = x + col_offset
+				if adjusted_y > max_y or adjusted_x < 0 or adjusted_x > max_x or board_copy[adjusted_y][adjusted_x] != 0:
+					lowest_positions.append(potential_y - 1)
+					break
+			else:
+				lowest_positions.append(max_y - y)
+		lowest_position = min(lowest_positions)
+
+		# Tester les mouvements latéraux pour combler un trou
+		valid_lateral_move = 0
+		for dx in [-1, 1]:
+			move_possible = True
+			temp_board = copy.deepcopy(board_copy)
+
+			# Vérifiez d'abord s'il n'y a pas de collision
+			for y, x in rotation:
+				new_x = x + col_offset + dx
+				new_y = y + lowest_position
+				if not (0 <= new_x <= max_x and 0 <= new_y <= max_y and temp_board[new_y][new_x] == 0):
+					move_possible = False
+					break
+			
+			if move_possible:
+				for y, x in rotation:
+					temp_board[y + lowest_position][x + col_offset + dx] = 8
+				# Vérifier si le mouvement remplit un trou
+				for y, x in rotation:
+					new_x = x + col_offset + dx
+					new_y = y + lowest_position
+					if new_y <= max_y and new_y >= 0 and temp_board[new_y][new_x] == 8:
+						# Il y a un trou sous le bloc après le mouvement
+						if temp_board[new_y - 1][new_x] != 0 and temp_board[new_y - 1][new_x] != 8:
+							return dx
+		return valid_lateral_move

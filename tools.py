@@ -1,4 +1,6 @@
-import time, os, random, threading, re
+import time, os, random, threading, re, copy, zlib, base64, datetime, cProfile, signal, pstats
+import numpy as np
+from dotenv import load_dotenv
 from selenium.webdriver.remote.webelement import WebElement
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -21,3 +23,4 @@ from selenium.common.exceptions import (
 	ElementNotSelectableException,
 	ElementClickInterceptedException,
 )
+load_dotenv()
