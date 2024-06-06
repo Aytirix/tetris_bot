@@ -9,7 +9,6 @@ class website():
 		self.driver = Driver()
 		self.driver.start_driver()
 		self.map = []
-		self.execute_move = []
 		self.lock = False
 		self.end_game = False
 
@@ -47,24 +46,9 @@ class website():
 		website.move(Keys.UP)
 		website.move(Keys.DOWN)
 		"""
-		if not self.driver.send_keys(By.CSS_SELECTOR, 'body', move):
+		if not self.driver.send_keys(By.CSS_SELECTOR, 'body', move, clear=False):
 			return False
-
-	def exexute_move(self):
-		"""
-		Execute les mouvements en attente
-
-		exemple:
-		website.execute_move.append(Keys.SPACE)
-		website.execute_move.append(Keys.LEFT)
-		website.execute_move.append(Keys.RIGHT)
-		website.execute_move.append(Keys.UP)
-		website.execute_move.append(Keys.DOWN)
-		"""
-		while threading.current_thread().is_alive() and not self.end_game:
-			for move in self.execute_move.copy():
-				self.move(move)
-				self.execute_move.remove(move)
+		time.sleep(1)
 
 	def logout(self):
 		"""

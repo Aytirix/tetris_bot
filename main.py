@@ -28,10 +28,6 @@ try:
 	thread.daemon = True
 	thread.start()
 
-	execute_move = threading.Thread(target=website.exexute_move)
-	execute_move.daemon = True
-	execute_move.start()
-
 	end_game = threading.Thread(target=website.check_end_game)
 	end_game.daemon = True
 	end_game.start()

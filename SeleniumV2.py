@@ -1,3 +1,4 @@
+import requests
 from tools import *
 
 """
@@ -33,7 +34,7 @@ class SeleniumV2():
 			}
 			# Si lé méthode error_screen n'est pas définie, on affiche le message d'erreur dans la console
 			if not hasattr(self, "error_screen"):
-				print_msg("ERREUR", f"{msg}", 'red')
+				print(f"{msg}")
 				return
 			return self.error_screen(add_erreur=f"{msg} | Erreur : {exception_map.get(type(e), f'{e}')}", check_erreur_ecoute=False)
 
@@ -74,7 +75,7 @@ class SeleniumV2():
 			return elements
 		except Exception as e:
 			message = value if msg == True else msg
-			self.handle_exception(e, f"Fonction : {inspect.stack()[1][3]} | Sélecteur : " + message if message not in [None, False, True] else message)
+			self.handle_exception(e, f"Fonction :  | Sélecteur : " + message if message not in [None, False, True] else message)
 			return None
 
 	def click_element(self, by: By = None, value: str = None, timeout: int = 1, msg: str = None, element: WebElement = None, wait: int = 2) -> bool:
@@ -189,9 +190,6 @@ class SeleniumV2():
 					"http": f"http://{self.proxy}",
 				}
 				response = requests.get(url, proxies=proxy_dict, timeout=10)
-			else:
-				# Cette méthode est plus rapide que requests.get si vous n'utilisez pas de proxy
-				socket.create_connection(("www.google.com", 443), timeout=10)
 			return True
 		except:
 			return False
@@ -214,7 +212,7 @@ class SeleniumV2():
 			WebDriverWait(self.driver, timeout).until(EC.frame_to_be_available_and_switch_to_it((by, value)))
 			return True
 		except Exception as e:
-			self.handle_exception(e, f"Fonction : {inspect.stack()[1][3]} | Sélecteur : " + value if msg == True else msg)
+			self.handle_exception(e, f"Fonction : | Sélecteur : " + value if msg == True else msg)
 			return False
 	
 	def change_page(self, page: str) -> bool:
