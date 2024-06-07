@@ -1,9 +1,6 @@
 from tools import *
-from IA.ia import QLearningAgent
-from IA.tetris_env import TetrisEnv
-from Tetris_map import Tetris_map
-import pyxhook
-import pyautogui
+from algo import algo_tetris
+from tetris_env import TetrisEnv
 
 class WebSocketListener:
 	def __init__(self, url, username, room):
@@ -20,13 +17,13 @@ class WebSocketListener:
 				return False
 			return True
 		except Exception as e:
-			print("Error", e)
+			print("Impossible de se connecter au serveur", e)
 			return False
 
-class bot(WebSocketListener, QLearningAgent):
+class bot(WebSocketListener, algo_tetris):
 	def __init__(self, url, username, room):
 		WebSocketListener.__init__(self, url, username, room)
-		QLearningAgent.__init__(self)
+		algo_tetris.__init__(self)
 		self.lock = False
 		self.actual_piece = None
 		self.env = TetrisEnv()
@@ -43,7 +40,6 @@ class bot(WebSocketListener, QLearningAgent):
 	def start_connection(self):
 		try:
 			if not self.connect_ws():
-				print("Connection failed")
 				return False
 			time.sleep(1)
 			self.ws.send("40")
@@ -209,25 +205,12 @@ class bot(WebSocketListener, QLearningAgent):
 			print("Error", e)
 			return False
 
-def launch_tetris(title, grid_size=(10, 20)):
-	try:
-		root = tk.Tk()
-		root.title(title)
-		app = Tetris_map(master=root, title=title)
-		app.update_grid([[0 for _ in range(grid_size[0])] for _ in range(grid_size[1])])
-		# mettre app dans le thread
-		threading.current_thread().app = app
-		threading.current_thread().root = root
-		root.mainloop()
-	except:
-		pass
-
-
 os.system("clear")
 
 time.sleep(1)
-
-listener = bot("ws://c2r7p2:3000/socket.io/?EIO=4&transport=websocket", "BOT", "42bot")
+username = os.getenv("USERNAME")
+room = os.getenv("ROOM")
+listener = bot("ws://c2r7p2:3000/socket.io/?EIO=4&transport=websocket", username, room)
 if not listener.start_connection():
 	exit(1)
 listener.start_game("journey")
@@ -260,6 +243,7 @@ hookman = pyxhook.HookManager()
 hookman.KeyDown = on_key_press
 hookman.HookKeyboard()
 hookman.start()
+print("Press Escape to leave the game")
 
 while True:
 	if not thread.is_alive():

@@ -1,110 +1,108 @@
-import copy
-from IA.tetris_env import TetrisEnv
-from tools import print_map
 from tools import *
-from website import *
-from IA.ia import QLearningAgent
+from tetris_env import TetrisEnv
 
-"""
-	0 = case vide
-	1 = case violette T
-	2 = case orange J
-	3 = case verte Z
-	4 = case jaune O
-	5 = case cyan I
-	6 = case bleue L
-	7 = case rouge S
-"""
+class algo_tetris:
+	def __init__(self):
+		pass
 
-class IA():
-	def __init__(self, website, socket):
-		self.website = website
-		self.socket = socket
-		self.actual_piece = None
-		self.agent = QLearningAgent()
-		self.width = 10
-		self.height = 20
-		self.board = None
-		self.piece_shapes = {
-			1: [  # T shape rotations
-				[(2, 5), (2, 6), (2, 7), (1, 6)],  # Original
-				[(1, 5), (2, 5), (3, 5), (2, 6)],   # 270 degrees
-				[(1, 5), (1, 6), (1, 7), (2, 6)],  # 180 degrees
-				[(1, 6), (2, 6), (3, 6), (2, 5)]  # 90 degrees
-			],
-			2: [  # L shape rotations
-				[(2, 5), (2, 6), (2, 7), (1, 7)],  # Original
-				[(1, 5), (2, 5), (3, 5), (3, 6)],  # 90 degrees
-				[(1, 5), (1, 6), (1, 7), (2, 5)],  # 180 degrees
-				[(1, 5), (1, 6), (2, 6), (3, 6)]   # 270 degrees
-			],
-			3: [  # J shape rotations
-				[(2, 5), (2, 6), (2, 7), (1, 5)],  # Original
-				[(1, 5), (2, 5), (3, 5), (1, 6)],   # 270 degrees
-				[(1, 5), (1, 6), (1, 7), (2, 7)],  # 180 degrees
-				[(1, 6), (2, 6), (3, 6), (3, 5)]  # 90 degrees
-			],
-			4: [  # O shape (only one rotation)
-				[(1, 5), (1, 6), (2, 5), (2, 6)]   # Original
-			],
-			5: [  # I shape rotations
-				[(1, 5), (2, 5), (3, 5), (4, 5)],  # Original
-				[(1, 5), (1, 6), (1, 7), (1, 8)]   # 90 degrees
-			],
-			6: [  # S shape rotations
-				[(2, 5), (2, 6), (1, 6), (1, 7)],  # Original
-				[(1, 5), (2, 5), (2, 6), (3, 6)]   # 90 degrees
-			],
-			7: [  # Z shape rotations
-				[(1, 5), (1, 6), (2, 6), (2, 7)],  # Original
-				[(1, 6), (2, 6), (2, 5), (3, 5)]   # 90 degrees
-			]
-		}
-		self.env = TetrisEnv(print_map=True)
+	def get_q_value(self, state, action):
+		env = TetrisEnv()
+		env.board, env.current_piece = copy.deepcopy(state)
+		next_state, reward, done = env.step(action)
+		q_value = reward
+		return q_value
 
-	def get_piece_movement(self):
-		while threading.current_thread().is_alive():
-			if not self.socket.map:
-				continue
-			for i in range(5, 8):
-				if self.socket.map[1][i] != 0 and self.socket.map[1][i] != self.actual_piece:
-					self.actual_piece = self.socket.map[1][i]
+	def choose_action(self, state, env):
+		_, piece = state
+		valid_actions = self.get_valid_actions(piece, env)
+		if not valid_actions:
+			return (0, 0, 0)
+		action_q_values = [(a, self.get_q_value(state, a)) for a in valid_actions]
+		# for action, q_value in action_q_values:
+		# 	print(f"Action {action} - Q-Value: {q_value}")
+		max_q_value = max(action_q_values, key=lambda x: x[1])[1]
+		best_actions = [action for action, q_value in action_q_values if q_value == max_q_value]
+		best_action = random.choice(best_actions)
+		# print(f"Best Action: {best_action}")
+		# print()
+		return best_action
+
+	def get_valid_actions(self, piece, env):
+		valid_actions = []
+		num_rotations = len(env.piece_shapes[piece])
+		for rot in range(num_rotations):
+			for col in range(-env.width + 1, env.width):
+				if self.is_valid_action(env, piece, rot, col):
+					valid_actions.append((rot, col, 0))
+					# last_move = self.is_late_move_valid(env, piece, rot, col)
+					# if last_move != 0:
+					# 	valid_actions.append((rot, col, last_move))
+		return valid_actions
+
+	def is_valid_action(self, env, piece, rotation_idx, col_offset):
+		rotation = env.piece_shapes[piece][rotation_idx]
+		max_x = env.height - 1
+		max_y = env.width - 1
+
+		for y, x in rotation:
+			start_x = x 
+			new_x = x + col_offset
+			new_y = y
+
+			if new_x < 0 or new_x > max_y or new_y > max_x:
+				return False  # le bloc cible est hors limites
+
+			# Déterminer la direction du balayage pour vérifier les cellules intermédiaires
+			step = 1 if new_x > start_x else -1
+
+			# Vérifier chaque cellule entre la position de départ et la position cible
+			for intermediate_x in range(start_x, new_x + step, step):
+				if env.board[new_y][intermediate_x] != 0 and env.board[new_y][intermediate_x] != piece:
+					return False
+		return True
+
+	def is_late_move_valid(self, env, piece, rotation_idx, col_offset):
+		rotation = env.piece_shapes[piece][rotation_idx]
+		max_x = env.width - 1
+		max_y = env.height - 1
+		board_copy = copy.deepcopy(env.board)
+
+		# Déterminez la position la plus basse pour la pièce
+		lowest_positions = []
+		for y, x in rotation:
+			for potential_y in range(max_y + 1):
+				adjusted_y = y + potential_y
+				adjusted_x = x + col_offset
+				if adjusted_y > max_y or adjusted_x < 0 or adjusted_x > max_x or board_copy[adjusted_y][adjusted_x] != 0:
+					lowest_positions.append(potential_y - 1)
 					break
+			else:
+				lowest_positions.append(max_y - y)
+		lowest_position = min(lowest_positions)
 
-	def execute_best_move(self):
-		if not self.actual_piece:
-			return None
-		self.board = np.array(self.socket.map)
+		# Tester les mouvements latéraux pour combler un trou
+		valid_lateral_move = 0
+		for dx in [-1, 1]:
+			move_possible = True
+			temp_board = copy.deepcopy(board_copy)
 
-		# self.env.board = copy.deepcopy(self.board)
-		# self.env.current_piece = self.actual_piece
-		best_move = self.agent.choose_action((self.board, self.actual_piece), self)
-		# self.env.step(best_move)
-		# print_map(self.env.board)
-		if not best_move:
-			return None
-		rotation_idx, target_col, last_move = best_move
-
-		# Rotate the piece to the best rotation
-		for _ in range(rotation_idx):
-			self.socket.send(["rotate"])
-
-		# Move the piece to the target column
-		if target_col > 0:
-			for _ in range(target_col):
-				self.socket.send(["right"])
-		else:
-			for _ in range(abs(target_col)):
-				self.socket.send(["left"])
-
-		# Drop the piece
-		# self.socket.send(Keys.SPACE)
-		# if last_move > 0:
-		# 	for _ in range(last_move):
-		# 		self.socket.send(["right"])
-		# else:
-		# 	for _ in range(abs(last_move)):
-		# 		self.socket.send(["left"])
-
-		self.socket.move(["drop"])
-		self.actual_piece = None
+			# Vérifiez d'abord s'il n'y a pas de collision
+			for y, x in rotation:
+				new_x = x + col_offset + dx
+				new_y = y + lowest_position
+				if not (0 <= new_x <= max_x and 0 <= new_y <= max_y and temp_board[new_y][new_x] == 0):
+					move_possible = False
+					break
+			
+			if move_possible:
+				for y, x in rotation:
+					temp_board[y + lowest_position][x + col_offset + dx] = 8
+				# Vérifier si le mouvement remplit un trou
+				for y, x in rotation:
+					new_x = x + col_offset + dx
+					new_y = y + lowest_position
+					if new_y <= max_y and new_y >= 0 and temp_board[new_y][new_x] == 8:
+						# Il y a un trou sous le bloc après le mouvement
+						if temp_board[new_y - 1][new_x] != 0 and temp_board[new_y - 1][new_x] != 8:
+							return dx
+		return valid_lateral_move

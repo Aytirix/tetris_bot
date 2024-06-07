@@ -127,18 +127,12 @@ class TetrisEnv:
 		else:
 			return self.get_state(), self.poids["move_error"], True
 
-
 	def calculate_reward(self):
-		complete_lines = self.get_complete_lines(self.board)
-		filled_cells_score = self.get_filled_cells_score(self.board)
-		holes = self.get_holes(self.board)
-		bumpiness = self.get_bumpiness(self.board)
-		max_height = self.get_max_height(self.board)
-		return complete_lines * self.poids["complete_lines"] \
-				+ filled_cells_score * self.poids["filled_cells_score"] \
-				- holes * self.poids["holes"] \
-				- bumpiness * self.poids["bumpiness"] \
-				- max_height * self.poids["max_height"]
+		return (self.get_complete_lines(self.board) * self.poids["complete_lines"] \
+				+ self.get_filled_cells_score(self.board) * self.poids["filled_cells_score"] \
+				- self.get_holes(self.board) * self.poids["holes"] \
+				- self.get_bumpiness(self.board) * self.poids["bumpiness"] \
+				- self.get_max_height(self.board) * self.poids["max_height"])
 
 	def get_filled_cells_score(self, board):
 		score = 0

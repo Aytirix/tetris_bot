@@ -1,9 +1,5 @@
-selenium==4.0.0
-webdriver-manager==4.0.1
-numpy
-mysql-connector-python
-matplotlib
-python-dotenv
-python-socketio
-pyxhook
-pyautogui
+numpy==1.26.4
+python-dotenv==1.0.1
+websocket-client==1.8.0
+pyxhook==1.0.0
+pyautogui==0.9.54
