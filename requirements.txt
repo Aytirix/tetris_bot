@@ -5,3 +5,5 @@ mysql-connector-python
 matplotlib
 python-dotenv
 python-socketio
+pyxhook
+pyautogui
