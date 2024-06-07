@@ -24,6 +24,7 @@ class Driver(SeleniumV2):
 		self.options.add_argument("--disable-blink-features=AutomationControlled") # pour ne pas être détecté par le site
 
 		self.capabilities = DesiredCapabilities.CHROME.copy()
+		self.capabilities["goog:loggingPrefs"] = {"performance": "ALL"}
 		self.capabilities['acceptSslCerts'] = True  # Accepte tous les certificats SSL.
 
 	def start_driver(self):

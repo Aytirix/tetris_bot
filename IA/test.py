@@ -1,4 +1,4 @@
-from IA.tools import *
+from tools import *
 from IA.tetris_env import TetrisEnv
 from IA.ia import QLearningAgent
 

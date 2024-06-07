@@ -8,9 +8,18 @@ class website():
 		self.username = username
 		self.driver = Driver()
 		self.driver.start_driver()
-		self.map = []
-		self.lock = False
 		self.end_game = False
+
+	def get_websocket(self):
+		"""
+		Récupère le websocket
+		"""
+		for _ in range(20):
+			network = self.driver.driver.get_log('performance')
+			for log in network:
+				if "Sec-WebSocket-Key" in str(log):
+					return re.findall(r'"Sec-WebSocket-Key":"(.*?)"', log["message"])[0]
+			time.sleep(1)
 
 	def login(self):
 		"""
@@ -56,8 +65,8 @@ class website():
 		"""
 		self.driver.stop_driver()
 		return True
-	
-	def get_map(self):
+
+	def update_map(self, map_string):
 		"""
 		Récupère la map sous forme d'un double tableau
 		Le premier tableau représente les lignes
@@ -72,45 +81,32 @@ class website():
 		6 = case bleue
 		7 = case rouge
 		"""
-		while threading.current_thread().is_alive() and not self.end_game:
-			tab = []
-			map = self.driver.presence_of_element(By.CSS_SELECTOR, '[class^="game-grid"]', attribut="outerHTML")
-			if not map:
-				print("Erreur lors de la récupération de la map")
-				self.map = []
-				return False
-			elems = re.findall(r'style="background-color: (.*?);', map)
-			if not elems:
-				print("Erreur lors de la récupération des cases")
-				self.map = []
-				return False
-			tab = [[] for _ in range(20)]
-			for col in range(0, 20):
-				for line in range(0, 20*10, 20):
-					color = 0
-					if "transparent" in elems[col+line]:
-						color = 0
-					elif "purple" in elems[col+line]:
-						color = 1
-					elif "orange" in elems[col+line]:
-						color = 2
-					elif "green" in elems[col+line]:
-						color = 3
-					elif "yellow" in elems[col+line]:
-						color = 4
-					elif "cyan" in elems[col+line]:
-						color = 5
-					elif "blue" in elems[col+line]:
-						color = 6
-					elif "red" in elems[col+line]:
-						color = 7
-					else:
-						print("Erreur lors de la récupération de la couleur" )
-						self.map = []
-						return False 
-					tab[col].append(color)
-			if not self.lock:
-				self.map = tab
+		if not map_string:
+			print("Erreur lors de la récupération de la map")
+			self.map = []
+			return False
+		elems = re.findall(r'"color":"(.*?)"', map_string)
+		if not elems:
+			print("Erreur lors de la récupération des cases")
+			self.map = []
+			return False
+		num_cols = 10
+		tab = [elems[i:i + num_cols] for i in range(0, len(elems), num_cols)]
+		color_map = {
+			"transparent": 0,
+			"purple": 1,
+			"orange": 2,
+			"green": 3,
+			"yellow": 4,
+			"cyan": 5,
+			"blue": 6,
+			"red": 7
+		}
+		for i in range(len(tab)):
+			for j in range(len(tab[i])):
+				tab[i][j] = color_map.get(tab[i][j], 0)
+		if not self.lock:
+			self.map = tab
 
 	def check_end_game(self):
 		"""

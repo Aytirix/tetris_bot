@@ -1,9 +1,9 @@
-from IA.tools import *
+from tools import *
 from IA.tetris_env import TetrisEnv
 
 class QLearningAgent:
 	def __init__(self):
-		self.q_values_cache = {}
+		pass
 
 	def get_q_value(self, state, action):
 		env = TetrisEnv()
@@ -19,20 +19,13 @@ class QLearningAgent:
 			return (0, 0, 0)
 		action_q_values = [(a, self.get_q_value(state, a)) for a in valid_actions]
 		# for action, q_value in action_q_values:
-		# 	print(f"Action {i}: {action} - Q-Value: {q_value}")
+		# 	print(f"Action {action} - Q-Value: {q_value}")
 		max_q_value = max(action_q_values, key=lambda x: x[1])[1]
 		best_actions = [action for action, q_value in action_q_values if q_value == max_q_value]
 		best_action = random.choice(best_actions)
 		# print(f"Best Action: {best_action}")
+		# print()
 		return best_action
-
-	def action_to_str(self, action):
-		rotation_idx, col, last_move = action
-		return f"{rotation_idx}-{col}-{last_move}"
-
-	def str_to_action(self, action_str):
-		rotation_idx, col = map(int, action_str.split('-'))
-		return rotation_idx, col
 
 	def get_valid_actions(self, piece, env):
 		valid_actions = []
@@ -64,9 +57,8 @@ class QLearningAgent:
 
 			# Vérifier chaque cellule entre la position de départ et la position cible
 			for intermediate_x in range(start_x, new_x + step, step):
-				if env.board[new_y][intermediate_x] != 0:
+				if env.board[new_y][intermediate_x] != 0 and env.board[new_y][intermediate_x] != piece:
 					return False
-
 		return True
 
 	def is_late_move_valid(self, env, piece, rotation_idx, col_offset):

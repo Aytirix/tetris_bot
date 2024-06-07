@@ -1,7 +1,7 @@
-from IA.tools import *
+from tools import *
 
 class TetrisEnv:
-	def __init__(self, height=20, width=10, complete_lines=200, filled_cells_score=0.3, holes=40, bumpiness=4, max_height=3, move_error=-10000, print_map=False):
+	def __init__(self, height=20, width=10, complete_lines=200, filled_cells_score=0.3, holes=50, bumpiness=4, max_height=3, move_error=-10000, print_map=False):
 		self.statistique ={
 			"complete_lines": 0,
 			"tetris": 0,
@@ -20,47 +20,50 @@ class TetrisEnv:
 		self.board = np.zeros((height, width))
 		self.piece_shapes = {
 			1: [  # T shape rotations
-				[(2, 5), (2, 6), (2, 7), (1, 6)],  # Original
-				[(1, 5), (2, 5), (3, 5), (2, 6)],   # 270 degrees
-				[(1, 5), (1, 6), (1, 7), (2, 6)],  # 180 degrees
-				[(1, 6), (2, 6), (3, 6), (2, 5)]  # 90 degrees
+				[(2, 5), (2, 6), (2, 7), (1, 6)],
+				[(1, 6), (2, 6), (3, 6), (2, 7)],
+				[(2, 5), (2, 6), (2, 7), (3, 6)],
+				[(1, 6), (2, 6), (3, 6), (2, 5)]
 			],
 			2: [  # L shape rotations
-				[(2, 5), (2, 6), (2, 7), (1, 7)],  # Original
-				[(1, 5), (2, 5), (3, 5), (3, 6)],  # 90 degrees
-				[(1, 5), (1, 6), (1, 7), (2, 5)],  # 180 degrees
-				[(1, 5), (1, 6), (2, 6), (3, 6)]   # 270 degrees
+				[(2, 5), (2, 6), (2, 7), (1, 7)],
+				[(1, 6), (2, 6), (3, 6), (3, 7)],
+				[(2, 5), (2, 6), (2, 7), (3, 5)],
+				[(1, 5), (1, 6), (2, 6), (3, 6)]
 			],
 			3: [  # J shape rotations
-				[(2, 5), (2, 6), (2, 7), (1, 5)],  # Original
-				[(1, 5), (2, 5), (3, 5), (1, 6)],   # 270 degrees
-				[(1, 5), (1, 6), (1, 7), (2, 7)],  # 180 degrees
-				[(1, 6), (2, 6), (3, 6), (3, 5)]  # 90 degrees
+			 	[(2, 5), (2, 6), (2, 7), (1, 5)],
+			 	[(1, 6), (2, 6), (3, 6), (1, 7)],
+			 	[(2, 5), (2, 6), (2, 7), (3, 7)],
+			 	[(3, 5), (1, 6), (2, 6), (3, 6)]
 			],
 			4: [  # O shape (only one rotation)
-				[(1, 5), (1, 6), (2, 5), (2, 6)]   # Original
+				[(1, 5), (1, 6), (2, 5), (2, 6)]
 			],
 			5: [  # I shape rotations
-				[(1, 5), (2, 5), (3, 5), (4, 5)],  # Original
-				[(1, 5), (1, 6), (1, 7), (1, 8)]   # 90 degrees
+				[(1, 6), (2, 6), (3, 6), (4, 6)],
+				[(2, 5), (2, 6), (2, 7), (2, 8)],
+				[(1, 7), (2, 7), (3, 7), (4, 7)],
+				[(3, 5), (3, 6), (3, 7), (3, 8)]
 			],
 			6: [  # S shape rotations
-				[(2, 5), (2, 6), (1, 6), (1, 7)],  # Original
-				[(1, 5), (2, 5), (2, 6), (3, 6)]   # 90 degrees
+				[(2, 5), (2, 6), (1, 6), (1, 7)],
+				[(1, 6), (2, 6), (2, 7), (3, 7)],
+				[(3, 5), (3, 6), (2, 6), (2, 7)],
+				[(1, 5), (2, 5), (2, 6), (3, 6)],
 			],
 			7: [  # Z shape rotations
-				[(1, 5), (1, 6), (2, 6), (2, 7)],  # Original
-				[(1, 6), (2, 6), (2, 5), (3, 5)]   # 90 degrees
+				[(1, 5), (1, 6), (2, 6), (2, 7)],
+				[(3, 6), (2, 6), (2, 7), (1, 7)],
+				[(2, 5), (2, 6), (3, 6), (3, 7)],
+				[(3, 5), (2, 5), (2, 6), (1, 6)]
 			]
 		}
 		self.current_piece = None
 		self.current_piece = self.random_piece()
 
 	def random_piece(self):
-		available_pieces = list(self.piece_shapes.keys())
-		if self.current_piece is not None:
-			available_pieces.remove(self.current_piece)
-		self.current_piece = random.choice(available_pieces)
+		self.current_piece = random.choice(list(self.piece_shapes.keys()))
 
 	def reset(self):
 		self.board = np.zeros((self.height, self.width))
@@ -84,37 +87,38 @@ class TetrisEnv:
 		max_x = len(board_copy) - 1
 		max_y = len(board_copy[0]) - 1
 
-		for _, y in rotation:
-			if y + col < 0 or y + col > max_y:
+		# Vérifier si la colonne est hors limites
+		for y, x in rotation:
+			if x + col < 0 or x + col > max_y:
 				return self.get_state(), self.poids["move_error"], True
 
 		lowest_position = max_x
-		for x, y in rotation:
+		for y, x in rotation:
 			for drop_row in range(max_x + 1):
-				test_x = drop_row + x
-				if test_x > max_x or board_copy[test_x][y + col] != 0:
+				test_x = drop_row + y
+				if test_x > max_x or board_copy[test_x][x + col] != 0:
 					lowest_position = min(lowest_position, drop_row - 1)
 					break
 
 		if lowest_position >= 0:
-			for x, y in rotation:
-				if lowest_position + x > max_x or lowest_position + x < 0 or y + col < 0 or y + col > max_y or board_copy[lowest_position + x][y + col] != 0:
+			for y, x in rotation:
+				if lowest_position + y > max_x or lowest_position + y < 0 or x + col < 0 or x + col > max_y or board_copy[lowest_position + y][x + col] != 0:
 					return self.get_state(), self.poids["move_error"], True
 
 			# Appliquer le dernier mouvement latéral si possible
 			if last_move != 0:
 				valid_last_move = True
-				for x, y in rotation:
-					new_y = y + col + last_move
-					if new_y < 0 or new_y > max_y or board_copy[lowest_position + x][new_y] != 0:
+				for y, x in rotation:
+					new_x = x + col + last_move
+					if new_x < 0 or new_x > max_y or board_copy[lowest_position + y][new_x] != 0:
 						valid_last_move = False
 						break
 				if valid_last_move:
 					col += last_move
 
 			# Placer la pièce
-			for x, y in rotation:
-				board_copy[lowest_position + x][y + col] = self.current_piece
+			for y, x in rotation:
+				board_copy[lowest_position + y][x + col] = self.current_piece
 			self.board = board_copy
 			reward = self.calculate_reward()
 			done = self.check_game_over()
@@ -122,6 +126,7 @@ class TetrisEnv:
 			return self.get_state(), reward, done
 		else:
 			return self.get_state(), self.poids["move_error"], True
+
 
 	def calculate_reward(self):
 		complete_lines = self.get_complete_lines(self.board)
