@@ -45,6 +45,9 @@ Chaque action est validée pour éviter les collisions et les placements hors li
    python3 main.py --journey
    ```
    ```
+   python3 main.py --join [room name]
+   ```
+   ```
    python3 main.py -classic
    ```
 
