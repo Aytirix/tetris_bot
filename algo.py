@@ -2,11 +2,14 @@ from tools import *
 from tetris_env import TetrisEnv
 
 class algo_tetris:
-	def __init__(self):
-		pass
+	def __init__(self, height=20, width=10, use_last_move=False, poids={"complete_lines": 200, "filled_cells_score": 0.3, "holes": 50, "bumpiness": 4, "max_height": 3, "move_error": -10000}):
+		self.height = height
+		self.width = width
+		self.use_last_move = use_last_move
+		self.poids = poids
 
 	def get_q_value(self, state, action):
-		env = TetrisEnv()
+		env = TetrisEnv(self.height, self.width, False, self.use_last_move, self.poids)
 		env.board, env.current_piece = copy.deepcopy(state)
 		next_state, reward, done = env.step(action)
 		q_value = reward
@@ -34,9 +37,10 @@ class algo_tetris:
 			for col in range(-env.width + 1, env.width):
 				if self.is_valid_action(env, piece, rot, col):
 					valid_actions.append((rot, col, 0))
-					# last_move = self.is_late_move_valid(env, piece, rot, col)
-					# if last_move != 0:
-					# 	valid_actions.append((rot, col, last_move))
+					if self.use_last_move:
+						last_move = self.is_late_move_valid(env, piece, rot, col)
+						if last_move != 0:
+							valid_actions.append((rot, col, last_move))
 		return valid_actions
 
 	def is_valid_action(self, env, piece, rotation_idx, col_offset):

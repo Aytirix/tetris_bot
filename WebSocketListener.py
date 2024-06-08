@@ -2,6 +2,16 @@ from tools import *
 from algo import algo_tetris
 from tetris_env import TetrisEnv
 
+poids = {
+	"complete_lines": float(os.getenv("BONUS_COMPLETE_LINE")),
+	"filled_cells_score": float(os.getenv("BONUS_FILLED_CELLS")),
+	"holes": float(os.getenv("MALUS_HOLE")),
+	"bumpiness": float(os.getenv("MALUS_BUMPINESS")),
+	"max_height": float(os.getenv("MALUS_HEIGHT_MAX")),
+	"move_error": float(os.getenv("MALUS_MOVE_ERROR"))
+}
+last_move = (os.getenv("C") == "True")
+
 class WebSocketListener:
 	def __init__(self, url, username, room):
 		self.uri = url
@@ -23,10 +33,12 @@ class WebSocketListener:
 class bot(WebSocketListener, algo_tetris):
 	def __init__(self, url, username, room):
 		WebSocketListener.__init__(self, url, username, room)
-		algo_tetris.__init__(self)
+		global poids
+		global last_move
+		algo_tetris.__init__(self, use_last_move=last_move, poids=poids)
 		self.lock = False
 		self.actual_piece = None
-		self.env = TetrisEnv()
+		self.env = TetrisEnv(check_move=last_move,poids=poids)
 		self.map = [[0 for _ in range(10)] for _ in range(20)]
 		self.end_game = False
 		self.stats = {

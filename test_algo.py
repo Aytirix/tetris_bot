@@ -9,22 +9,25 @@ tetris = 0
 total_game = 0
 stop_requested = False
 totalepisode = 0
+last_move = (os.getenv("C") == "True")
 debug_print_map = (os.getenv("PRINT_MAP") == "True")
 infinit_training = (os.getenv("INFINI_TRAINING") == "True")
 
-malus_move_error = float(os.getenv("MALUS_MOVE_ERROR"))
-complete_lines = float(os.getenv("BONUS_COMPLETE_LINE"))
-filled_cells_score = float(os.getenv("BONUS_FILLED_CELLS"))
-holes = float(os.getenv("MALUS_HOLE"))
-bumpiness = float(os.getenv("MALUS_BUMPINESS"))
-max_height = float(os.getenv("MALUS_HEIGHT_MAX"))
+poids = {
+	"complete_lines": float(os.getenv("BONUS_COMPLETE_LINE")),
+	"filled_cells_score": float(os.getenv("BONUS_FILLED_CELLS")),
+	"holes": float(os.getenv("MALUS_HOLE")),
+	"bumpiness": float(os.getenv("MALUS_BUMPINESS")),
+	"max_height": float(os.getenv("MALUS_HEIGHT_MAX")),
+	"move_error": float(os.getenv("MALUS_MOVE_ERROR"))
+}
 tetris_height = int(os.getenv("TETRIS_HEIGHT"))
 tetris_width = int(os.getenv("TETRIS_WIDTH"))
 
 def handle_stop_signal(signal, frame):
 	global stop_requested
 	stop_requested = True
-	print("Arrêt demandé, enregistrement des valeurs Q...")
+	print("Arrêt demandé, arrêt du programme..")
 signal.signal(signal.SIGINT, handle_stop_signal)
 
 def run_session(env, agent, num_episodes):
@@ -60,8 +63,8 @@ def launch_thread(num_threads, num_episodes):
 	try:
 		for i in range(num_threads):
 			print(f"Lancement du thread {i + 1}/{num_threads}")
-			env = TetrisEnv(tetris_height, tetris_width, complete_lines, filled_cells_score, holes, bumpiness, max_height, malus_move_error, debug_print_map)
-			agent = algo_tetris()
+			env = TetrisEnv(tetris_height, tetris_width, debug_print_map, last_move, poids)
+			agent = algo_tetris(tetris_height, tetris_width, last_move, poids)
 			t = threading.Thread(target=run_session, args=(env, agent, num_episodes))
 			threads.append(t)
 			t.start()
@@ -85,10 +88,10 @@ try:
 		if len(threads) < num_threads and not stop_requested and infinit_training:
 			total_relance += num_threads - len(threads)
 			launch_thread(num_threads - len(threads), num_episodes)
-		if not print_map:
+		if not debug_print_map:
 			os.system("clear" if os.name == "posix" else "cls")
 			print(f"Nombre de threads restants: {len(threads)}")
-		time.sleep(1)
+		time.sleep(2)
 except Exception as e:
 	print(f"Erreur lors de la vérification des threads: {e}")
 
@@ -96,5 +99,3 @@ print(f"Total de parties jouées: {total_game} - Total de parties relancées: {t
 print("Résumé des parties:")
 print(f"Total Episode: {totalepisode} - Total lines: {line} - Total tetris: {tetris} soit en moyenne {line / totalepisode} lignes et {tetris / totalepisode} tetris par partie.")
 print(f"meilleur score: {max_line} lignes et {max_tetris} tetris")
-
-print("Apprentissage terminé.")

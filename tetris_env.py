@@ -1,19 +1,13 @@
 from tools import *
 
 class TetrisEnv:
-	def __init__(self, height=20, width=10, complete_lines=200, filled_cells_score=0.3, holes=50, bumpiness=4, max_height=3, move_error=-10000, print_map=False):
+	def __init__(self, height=20, width=10, print_map=False, check_last_move=False, poids={"complete_lines": 200, "filled_cells_score": 0.3, "holes": 50, "bumpiness": 4, "max_height": 3, "move_error": -10000}):
 		self.statistique ={
 			"complete_lines": 0,
 			"tetris": 0,
 		}
-		self.poids = {
-			"complete_lines": complete_lines,
-			"filled_cells_score": filled_cells_score,
-			"holes": holes,
-			"bumpiness": bumpiness,
-			"max_height": max_height,
-			"move_error": move_error
-		}
+		self.check_last_move = check_last_move
+		self.poids = poids
 		self.print_map = print_map
 		self.height = height
 		self.width = width
@@ -106,7 +100,7 @@ class TetrisEnv:
 					return self.get_state(), self.poids["move_error"], True
 
 			# Appliquer le dernier mouvement latéral si possible
-			if last_move != 0:
+			if last_move != 0 and self.check_last_move:
 				valid_last_move = True
 				for y, x in rotation:
 					new_x = x + col + last_move
