@@ -31,13 +31,17 @@ class WebSocketListener:
 			return False
 
 class bot(WebSocketListener, algo_tetris):
-	def __init__(self, url, username, room, last_move, poids):
+	def __init__(self, url, game_mode, username, room, room_join, last_move, poids):
 		WebSocketListener.__init__(self, url, username, room)
 		algo_tetris.__init__(self, use_last_move=last_move, poids=poids)
 		self.lock = False
 		self.actual_piece = None
 		self.env = TetrisEnv(check_last_move=last_move,poids=poids)
 		self.map = [[0 for _ in range(10)] for _ in range(20)]
+		self.game_mode = game_mode
+		self.room = room
+		self.username = username
+		self.room_join = room_join
 		self.end_game = False
 		self.stats = {
 			"score": 0,
@@ -119,7 +123,8 @@ class bot(WebSocketListener, algo_tetris):
 				"yellow": 4,
 				"cyan": 5,
 				"red": 6,
-				"green": 7
+				"green": 7,
+				"gray": 8
 			}
 			for line in map:
 				for i in range(len(line)):
@@ -151,44 +156,34 @@ class bot(WebSocketListener, algo_tetris):
 						for j in range(1, col+1):
 							self.move("right")
 					self.move("drop")
-					time.sleep(0.1)
+					if self.game_mode == "classic":
+						time.sleep(0.2)
+					time.sleep(0.2)
 					self.env.current_piece = None
 			return True
 		except Exception as e:
 			print("Error", e)
 			return False
 
-	def start_game(self, game_mode):
+	def start_game(self):
 		try:
-			if game_mode == "classic":
-				self.ws.send(
-					'42["join_room",{"username":"%s","room":"%s"}]'
-					% (self.username, self.room)
-				)
-			elif game_mode == "journey":
-				self.ws.send(
-					'42["join_room_journey",{"username":"%s","room":"%s"}]'
-					% (self.username, self.room)
-				)
+			if self.game_mode == "classic":
+				self.ws.send('42["join_room",{"username":"%s","room":"%s"}]'
+					% (self.username, self.room))
+			elif self.game_mode == "journey":
+				self.ws.send('42["join_room_journey",{"username":"%s","room":"%s"}]'
+					% (self.username, self.room))
 			else:
 				print("Invalid game mode")
 				exit(1)
 			time.sleep(1)
-			self.ws.send(
-				'42["redirect_game",{"room":"%s","username":"%s"}]'
-				% (self.room, self.username)
-			)
-			time.sleep(1)
-			if game_mode == "classic":
+			if self.game_mode == "classic" and not self.room_join:
 				sleep = input("Press Enter to start the game")
-			self.ws.send(
-				'42["redirect_game",{"room":"%s","username":"%s"}]'
-				% (self.room, self.username)
-			)
-			self.ws.send(
-				'42["game_started",{"username":"%s","room":"%s"}]'
-				% (self.username, self.room)
-			)
+			if not self.room_join:
+				self.ws.send(
+					'42["game_started",{"username":"%s","room":"%s"}]'% (self.username, self.room))
+			self.ws.send('42["redirect_game",{"room":"%s","username":"%s"}]'
+				% (self.room, self.username))
 			return True
 		except Exception as e:
 			print("Error", e)
@@ -219,16 +214,18 @@ class bot(WebSocketListener, algo_tetris):
 			print("Error", e)
 			return False
 
-def start_saso(game_mode):
+def start_saso(game_mode, room_join=None):
 	os.system("clear")
-
 	time.sleep(1)
 	username = os.getenv("USERNAME")
-	room = os.getenv("ROOM")
-	listener = bot("ws://c2r7p2:3000/socket.io/?EIO=4&transport=websocket", username, room, last_move, poids)
+	room = os.getenv("ROOM") if not room_join else room_join
+	room_join = room_join if room_join else None
+	print("Room:", room)
+	print("room_join:", room_join)
+	listener = bot("ws://c2r7p2:3000/socket.io/?EIO=4&transport=websocket", game_mode, username, room, room_join, last_move, poids)
 	if not listener.start_connection():
 		exit(1)
-	listener.start_game(game_mode)
+	listener.start_game()
 
 	piece = threading.Thread(target=listener.play)
 	piece.daemon = True

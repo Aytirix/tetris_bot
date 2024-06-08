@@ -100,13 +100,13 @@ class algo_tetris:
 			
 			if move_possible:
 				for y, x in rotation:
-					temp_board[y + lowest_position][x + col_offset + dx] = 8
+					temp_board[y + lowest_position][x + col_offset + dx] = 9
 				# Vérifier si le mouvement remplit un trou
 				for y, x in rotation:
 					new_x = x + col_offset + dx
 					new_y = y + lowest_position
-					if new_y <= max_y and new_y >= 0 and temp_board[new_y][new_x] == 8:
+					if new_y <= max_y and new_y >= 0 and temp_board[new_y][new_x] == 9:
 						# Il y a un trou sous le bloc après le mouvement
-						if temp_board[new_y - 1][new_x] != 0 and temp_board[new_y - 1][new_x] != 8:
+						if temp_board[new_y - 1][new_x] != 0 and temp_board[new_y - 1][new_x] != 9:
 							return dx
 		return valid_lateral_move

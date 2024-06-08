@@ -26,7 +26,7 @@ def print_map(map, linecompleteindex = []):
 			elif map[y][x] == 7:
 				print("🟩", end="")
 			elif map[y][x] == 8:
-				print("🔴", end="")
+				print("⬜", end="")
 		if linecompleteindex is not None and y in linecompleteindex:
 			print("⬅️", end="")
 		print("")
