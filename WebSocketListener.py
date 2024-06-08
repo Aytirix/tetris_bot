@@ -31,14 +31,12 @@ class WebSocketListener:
 			return False
 
 class bot(WebSocketListener, algo_tetris):
-	def __init__(self, url, username, room):
+	def __init__(self, url, username, room, last_move, poids):
 		WebSocketListener.__init__(self, url, username, room)
-		global poids
-		global last_move
 		algo_tetris.__init__(self, use_last_move=last_move, poids=poids)
 		self.lock = False
 		self.actual_piece = None
-		self.env = TetrisEnv(check_move=last_move,poids=poids)
+		self.env = TetrisEnv(check_last_move=last_move,poids=poids)
 		self.map = [[0 for _ in range(10)] for _ in range(20)]
 		self.end_game = False
 		self.stats = {
@@ -184,6 +182,10 @@ class bot(WebSocketListener, algo_tetris):
 			if game_mode == "classic":
 				sleep = input("Press Enter to start the game")
 			self.ws.send(
+				'42["redirect_game",{"room":"%s","username":"%s"}]'
+				% (self.room, self.username)
+			)
+			self.ws.send(
 				'42["game_started",{"username":"%s","room":"%s"}]'
 				% (self.username, self.room)
 			)
@@ -217,49 +219,50 @@ class bot(WebSocketListener, algo_tetris):
 			print("Error", e)
 			return False
 
-os.system("clear")
+def start_saso(game_mode):
+	os.system("clear")
 
-time.sleep(1)
-username = os.getenv("USERNAME")
-room = os.getenv("ROOM")
-listener = bot("ws://c2r7p2:3000/socket.io/?EIO=4&transport=websocket", username, room)
-if not listener.start_connection():
-	exit(1)
-listener.start_game("journey")
-
-piece = threading.Thread(target=listener.play)
-piece.daemon = True
-piece.start()
-
-thread = threading.Thread(target=listener.listen_forever)
-thread.daemon = True
-thread.start()
-
-def on_key_press(event):
-	if event.Key == "Escape":
-		listener.leave_game()
-		listener.end_game = True
-		listener.ws.close()
-		exit(0)
-
-def move_mouse():
-	while True:
-		pyautogui.moveRel(1, 0)
-		time.sleep(60)
-
-thread_mouse = threading.Thread(target=move_mouse)
-thread_mouse.daemon = True
-thread_mouse.start()
-
-hookman = pyxhook.HookManager()
-hookman.KeyDown = on_key_press
-hookman.HookKeyboard()
-hookman.start()
-print("Press Escape to leave the game")
-
-while True:
-	if not thread.is_alive():
-		break
-	if not piece.is_alive():
-		break
 	time.sleep(1)
+	username = os.getenv("USERNAME")
+	room = os.getenv("ROOM")
+	listener = bot("ws://c2r7p2:3000/socket.io/?EIO=4&transport=websocket", username, room, last_move, poids)
+	if not listener.start_connection():
+		exit(1)
+	listener.start_game(game_mode)
+
+	piece = threading.Thread(target=listener.play)
+	piece.daemon = True
+	piece.start()
+
+	thread = threading.Thread(target=listener.listen_forever)
+	thread.daemon = True
+	thread.start()
+
+	def on_key_press(event):
+		if event.Key == "Escape":
+			listener.leave_game()
+			listener.end_game = True
+			listener.ws.close()
+			exit(0)
+
+	def move_mouse():
+		while True:
+			pyautogui.moveRel(1, 0)
+			time.sleep(60)
+
+	thread_mouse = threading.Thread(target=move_mouse)
+	thread_mouse.daemon = True
+	thread_mouse.start()
+
+	hookman = pyxhook.HookManager()
+	hookman.KeyDown = on_key_press
+	hookman.HookKeyboard()
+	hookman.start()
+	print("Press Escape to leave the game")
+
+	while True:
+		if not thread.is_alive():
+			break
+		if not piece.is_alive():
+			break
+		time.sleep(1)

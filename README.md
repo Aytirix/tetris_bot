@@ -42,7 +42,10 @@ Chaque action est validée pour éviter les collisions et les placements hors li
 
 5. Pour lancer le bot sur le jeu de saso :
    ```
-   python3 main.py -s
+   python3 main.py --journey
+   ```
+   ```
+   python3 main.py -classic
    ```
 
 ## Configuration des Variables d'Environnement
