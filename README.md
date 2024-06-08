@@ -66,6 +66,7 @@ Pour configurer le Tetris bot, définissez les variables nécessaires dans un fi
 - `MALUS_HEIGHT_MAX`: Pénalité pour la hauteur maximale atteinte sur le plateau (3 par défaut).
 
 ### Configuration de l'exécution
+- `LAST_MOVE`: Calculer les mouvements latéraux quand la pièce est en bas (False par défaut).
 - `PRINT_MAP`: Contrôle l'affichage du plateau après chaque mouvement (True par défaut).
 - `QQT_THREADS`: Nombre de parties simultanées traitées par le bot (1 par défaut).
 - `QQT_EPISODES`: Nombre de parties jouées par chaque thread (1 par défaut).
