@@ -14,7 +14,7 @@ if __name__ == "__main__":
 		if args.journey:
 			saso = start_saso("journey")
 		elif args.classic:
-			saso = start_saso("clasic")
+			saso = start_saso("classic")
 		else:
 			parser.print_help()
 	elif args.local:

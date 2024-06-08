@@ -172,7 +172,7 @@ class bot(WebSocketListener, algo_tetris):
 				)
 			else:
 				print("Invalid game mode")
-				return
+				exit(1)
 			time.sleep(1)
 			self.ws.send(
 				'42["redirect_game",{"room":"%s","username":"%s"}]'
