@@ -5,7 +5,7 @@
 L'algorithme `algo_tetris` est conçu pour optimiser la stratégie de jeu dans Tetris. Il fonctionne selon les étapes suivantes :
 
 ### Évaluation des Actions
-Pour chaque pièce actuelle, l'algorithme identifie toutes les actions valides (rotations et déplacements) et calcule leur valeur Q en simulant les résultats dans l'environnement Tetris.
+Pour chaque pièce actuelle, l'algorithme identifie toutes les actions valides (rotations et déplacements) et calcule leur valeur Q en simulant les résultats dans un environnement local de Tetris.
 
 ### Sélection de l'Action
 L'action qui maximise la valeur Q est choisie comme le meilleur mouvement. En cas d'égalité entre plusieurs actions, un choix aléatoire est effectué parmi les meilleures options.
@@ -53,7 +53,7 @@ Chaque action est validée pour éviter les collisions et les placements hors li
 
 ## Configuration des Variables d'Environnement
 
-Pour configurer le Tetris bot, définissez les variables nécessaires dans un fichier `.env` à la racine du projet. Les détails de chaque variable sont expliqués ci-dessous :
+Pour configurer le Tetris bot, il y a un fichier `.env` à la racine du projet. Les détails de chaque variable sont expliqués ci-dessous :
 
 ### Identification et Accès
 - `USERNAME`: Nom d'utilisateur du bot pour la connexion aux services.
