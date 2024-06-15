@@ -156,9 +156,9 @@ class bot(WebSocketListener, algo_tetris):
 						for j in range(1, col+1):
 							self.move("right")
 					self.move("drop")
-					if self.game_mode == "classic":
-						time.sleep(0.2)
-					time.sleep(0.2)
+					# if self.game_mode == "classic":
+					# 	time.sleep(0.2)
+					time.sleep(0.1)
 					self.env.current_piece = None
 			return True
 		except Exception as e:
@@ -222,7 +222,7 @@ def start_saso(game_mode, room_join=None):
 	room_join = room_join if room_join else None
 	print("Room:", room)
 	print("room_join:", room_join)
-	listener = bot("ws://c2r7p2:3000/socket.io/?EIO=4&transport=websocket", game_mode, username, room, room_join, last_move, poids)
+	listener = bot("ws://c1r2p9:3000/socket.io/?EIO=4&transport=websocket", game_mode, username, room, room_join, last_move, poids)
 	if not listener.start_connection():
 		exit(1)
 	listener.start_game()

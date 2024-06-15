@@ -155,6 +155,7 @@ class TetrisEnv:
 		self.statistique["complete_lines"] += complete_lines
 		if complete_lines == 4:
 			self.statistique["tetris"] += 1
+			self.statistique["complete_lines"] -= 4
 		return complete_lines
 
 	def get_holes(self, board):

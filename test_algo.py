@@ -55,8 +55,6 @@ def run_session(env, agent, num_episodes):
 			max_tetris = env.statistique["tetris"]
 		tetris += env.statistique["tetris"]
 		total_game += 1
-		# print("\n\n\n")
-		# print_map(state[0])
 
 def launch_thread(num_threads, num_episodes):
 	global threads
